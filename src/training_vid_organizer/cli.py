@@ -1,9 +1,8 @@
 """CLI entry point using Typer."""
 
-import sys
 from pathlib import Path
 
-from typer import Typer, echo, Argument, Option
+from typer import Argument, Exit, Option, Typer, echo
 
 from training_vid_organizer.__init__ import __version__
 
@@ -34,7 +33,7 @@ def search(
     search_path = Path(path).expanduser().resolve()
 
     if not search_path.exists():
-        raise typer.Exit(1)
+        raise Exit(1)
 
     echo(f"Searching in: {search_path}")
     # TODO: Implement actual search logic
@@ -48,9 +47,8 @@ def categorize(
 ):
     """Categorize videos with given tags."""
     if not tags:
-        raise typer.Exit(1)
+        raise Exit(1)
 
-    output_path = Path(output_dir).expanduser().resolve()
     echo(f"Categorizing videos with tags: {', '.join(tags)}")
     # TODO: Implement actual categorization logic
     echo("Categorization functionality coming soon...")
@@ -65,7 +63,7 @@ def metadata(
     video_path = Path(path).expanduser().resolve()
 
     if not video_path.exists():
-        raise typer.Exit(1)
+        raise Exit(1)
 
     # TODO: Implement actual metadata extraction logic
     echo(f"Metadata for: {video_path}")

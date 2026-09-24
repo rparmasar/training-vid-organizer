@@ -59,3 +59,4 @@ Thumbs.db
 videos/
 .metadata/
 .secrets/
+.ruff_cache/

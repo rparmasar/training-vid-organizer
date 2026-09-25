@@ -96,82 +96,49 @@ tests/test_schema.py::test_schema_creation PASSED                       [ 100%]
 ```
 
 ### Next Steps (Remaining Phases)
-- Phase 3: Single lift command (`src/commands/add_lift.py`)
-- Phase 4: Session processing (`src/commands/add_session.py`)
-- Phase 5: Query/list command (`src/commands/list_videos.py`)
-- Phase 6: Update entry command (`src/commands/update_entry.py`)
+- Phase 3: Single lift command (`src/training_vid_organizer/cli.py`)
+- Phase 4: Session processing (`src/training_vid_organizer/cli.py`)
+- Phase 5: Query/list command (`src/training_vid_organizer/cli.py`)
+- Phase 6: Update entry command (`src/training_vid_organizer/cli.py`)
 - Phases 7-8: Analysis queries and integration testing
 
-
 ---
 
-## Phase 2: Database Layer (`src/db.py`)
+## Phase 3: Single Lift Command (`src/training_vid_organizer/cli.py`)
 
 ### Tasks
-1. **Implement DB class with CRUD methods**
-   ```python
-   # Run: cat > src/db.py << 'PYEOF' && python -m py_compile src/db.py
-   import sqlite3
-   from contextlib import contextmanager
-   
-   class DB:
-       def __init__(self, db_path='db/training.db'):
-           self.path = db_path
-       
-       @contextmanager
-       def connection(self):
-           conn = sqlite3.connect(self.path)
-           try:
-               yield conn
-           finally:
-               conn.close()
-       
-       def init_schema(self):
-           with self.connection() as conn:
-               c = conn.cursor()
-               # (same schema as Phase 1)
-               pass
-   
-       def add_lift_entry(self, **kwargs):
-           with self.connection() as conn:
-               c = conn.cursor()
-               c.execute('''INSERT INTO lifts 
-                   (date,bodyweight,lift,weight,reps,top_set,reps_in_reserve,filepath,program,program_iteration)
-                   VALUES (?,?,?,?,?,?,?,?,?)''',
-                       (kwargs['date'], kwargs.get('bodyweight'), kwargs['lift'],
-                        kwargs['weight'], kwargs['reps'], kwargs.get('top_set', False),
-                        kwargs.get('reps_in_reserve'), kwargs.get('filepath'),
-                        kwargs.get('program'), kwargs.get('program_iteration')))
-               conn.commit()
-               return c.lastrowid
-   
-       def add_session_entries(self, entries):
-           with self.connection() as conn:
-               c = conn.cursor()
-               placeholders = ','.join(['?' for _ in entries])
-               cols = ', '.join(['date','bodyweight','lift','weight','reps','top_set',
-                                'reps_in_reserve','filepath','program','program_iteration'])
-               c.execute(f'''INSERT INTO lifts ({cols}) VALUES ({placeholders})''',
-                         [e.values for e in entries])
-               conn.commit()
-   
-       def list_entries(self, query='SELECT * FROM lifts'):
-           with self.connection() as conn:
-               c = conn.cursor()
-               c.execute(query)
-               return c.fetchall()
-       
-       def update_entry(self, entry_id, **kwargs):
-           with self.connection() as conn:
-               c = conn.cursor()
-               updates = []
-               values = [entry_id]
-               for k in kwargs.keys():
-                   updates.append(f'{k}=?')
-                   values.append(kwargs[k])
-               c.execute(f'UPDATE lifts SET {",".join(updates)} WHERE id=?', values)
-               conn.commit()
-   ```
+1. **Implement add lift command** (Typer parses args → creates LiftEntry dataclass → passes to pure function)
+    ```python
+    # Run: cat > src/training_vid_organizer/cli.py << 'PYEOF' && python -m py_compile src/training_vid_organizer/cli.py
+    from typer import Typer, echo
+    from src.db import DB
+    from src.models import LiftEntry
+
+    app = Typer(name="training-vid-organizer")
+
+    @app.command()
+    def add_lift(
+        date: str,
+        bodyweight: float | None = None,
+        lift: str,
+        weight: float,
+        reps: int,
+    ):
+        """Add a single lift entry."""
+        db = DB()
+        entry = LiftEntry(
+            date=date,
+            bodyweight=bodyweight,
+            lift=lift,
+            weight=weight,
+            reps=reps,
+        )
+        result = add_lift(db, entry)  # pure function with typed dataclass
+        echo(f"Added {result} entry/entries")
+
+    if __name__ == '__main__':
+        app()
+    ```
 
 ### Test Gate
 ```bash
@@ -180,34 +147,30 @@ pytest tests/ -v && pytest .
 
 ---
 
-## Phase 3: Single Lift Command (`src/commands/add_lift.py`)
+## Phase 4: Session Processing (`src/training_vid_organizer/cli.py`)
 
 ### Tasks
-1. **Implement add lift command**
-   ```python
-   # Run: cat > src/commands/add_lift.py << 'PYEOF' && python -m py_compile src/commands/add_lift.py
-   import sys
-   from pathlib import Path
-   
-   def parse_args(args):
-       kwargs = {}
-       for i, arg in enumerate(args[1:], 1):
-           if '=' in arg:
-               key, val = arg.split('=', 1)
-               kwargs[key] = val
-           else:
-               kwargs[f'arg_{i}'] = arg
-       return kwargs
-   
-   def main():
-       args = parse_args(sys.argv)
-       db = DB()
-       entry_id = db.add_lift_entry(**args)
-       print(f"Added lift entry with id={entry_id}")
-   
-   if __name__ == '__main__':
-       main()
-   ```
+1. **Implement add session command** (Typer parses args → loads JSON list[LiftEntry] dicts → converts to LiftEntry instances → batch pure function)
+    ```python
+    # Run: cat >> src/training_vid_organizer/cli.py << 'PYEOF' && python -m py_compile src/training_vid_organizer/cli.py
+    import json
+
+    @app.command()
+    def add_session(config: str):
+        """Add multiple lift entries from JSON config."""
+        db = DB()
+        with open(config) as f:
+            data = json.load(f)  # list[LiftEntry] dicts
+        
+        # Convert dicts to LiftEntry instances (or pass directly if using dict[str, Any])
+        entries = [LiftEntry(**d) for d in data]
+        
+        result = add_session(db, entries)  # pure function with typed list[LiftEntry]
+        echo(f"Added {result} entry/entries")
+
+    if __name__ == '__main__':
+        app()
+    ```
 
 ### Test Gate
 ```bash
@@ -216,44 +179,33 @@ pytest tests/ -v && pytest .
 
 ---
 
-## Phase 4: Session Processing (`src/commands/add_session.py`)
+## Phase 5: Query/List Command (`src/training_vid_organizer/cli.py`)
 
 ### Tasks
-1. **Implement add session command**
-   ```python
-   # Run: cat > src/commands/add_session.py << 'PYEOF' && python -m py_compile src/commands/add_session.py
-   import json, sys
-   
-   def parse_args(args):
-       kwargs = {}
-       for i, arg in enumerate(args[1:], 1):
-           if '=' in arg:
-               key, val = arg.split('=', 1)
-               kwargs[key] = val
-           else:
-               kwargs[f'arg_{i}'] = arg
-       return kwargs
-   
-   def main():
-       args = parse_args(sys.argv)
-       
-       # Load config JSON
-       if 'config' in args:
-           with open(args['config']) as f:
-               entries_data = json.load(f)
-           
-           db = DB()
-           for entry in entries_data:
-               db.add_lift_entry(**entry)
-           print(f"Added {len(entries_data)} session entries")
-       
-       # Infer mode (placeholder)
-       elif 'infer' in args and args['infer'] == 'true':
-           print("Infer mode: match config to existing files")
-   
-   if __name__ == '__main__':
-       main()
-   ```
+1. **Implement list videos command** (Typer parses args → filters dict → pure function query)
+    ```python
+    # Run: cat >> src/training_vid_organizer/cli.py << 'PYEOF' && python -m py_compile src/training_vid_organizer/cli.py
+    from typing import Any
+
+    @app.command()
+    def list_videos(lift: str | None = None):
+        """List training videos."""
+        db = DB()
+        
+        if lift is not None:
+            results = list_videos(db, {'lift': lift})  # type: ignore[union-attr]
+        else:
+            results = list_videos(db)
+        
+        print(f"\n{'ID':<5} {'Date':<12} {'Lift':<18} {'Weight':<7} {'Reps':<6}")
+        for row in results:
+            print(f"{row[0]:<5} {row[1]:<12} {row[3]:<18} {row[4]:<7} {row[5]:<6}")
+        
+        return 0
+
+    if __name__ == '__main__':
+        app()
+    ```
 
 ### Test Gate
 ```bash
@@ -262,86 +214,43 @@ pytest tests/ -v && pytest .
 
 ---
 
-## Phase 5: Query/List Command (`src/commands/list_videos.py`)
+## Phase 6: Update Entry Command (`src/training_vid_organizer/cli.py`)
 
 ### Tasks
-1. **Implement list videos command**
-   ```python
-   # Run: cat > src/commands/list_videos.py << 'PYEOF' && python -m py_compile src/commands/add_lift.py
-   import sys
-   
-   def parse_args(args):
-       kwargs = {}
-       for i, arg in enumerate(args[1:], 1):
-           if '=' in arg:
-               key, val = arg.split('=', 1)
-               kwargs[key] = val
-           else:
-               kwargs[f'arg_{i}'] = arg
-       return kwargs
-   
-   def main():
-       args = parse_args(sys.argv)
-       
-       db = DB()
-       query = 'SELECT * FROM lifts'
-       
-       # Simple filter support (extendable)
-       if 'lift=' in args:
-           lift = args['lift=']
-           query += f" WHERE lift='{lift}'"
-       
-       results = db.list_entries(query)
-       
-       print(f"\n{'ID':<5} {'Date':<12} {'Lift':<18} {'Weight':<7} {'Reps':<6}")
-       for row in results:
-           print(f"{row[0]:<5} {row[1]:<12} {row[3]:<18} {row[4]:<7} {row[5]:<6}")
-   
-   if __name__ == '__main__':
-       main()
-   ```
+1. **Implement update entry command** (Typer parses args → patch dict → pure function)
+    ```python
+    # Run: cat >> src/training_vid_organizer/cli.py << 'PYEOF' && python -m py_compile src/training_vid_organizer/cli.py
+    from typing import Any
+
+    @app.command()
+    def update_entry(entry_id: int, **kwargs: str):
+        """Update a lift entry by ID."""
+        db = DB()
+        
+        if '--id' not in kwargs:
+            print("Error: --id is required")
+            return 1
+        
+        try:
+            entry_id = int(kwargs['--id'])  # type: ignore[union-attr]
+        except ValueError:
+            print("Error: --id must be an integer")
+            return 1
+        
+        updates = {k.replace('--',''): v for k,v in kwargs.items() if k.startswith('--')}  # type: ignore[union-attr]
+        
+        result = update_entry(db, entry_id, updates)  # pure function with patch dict
+        echo(f"Updated entry {entry_id}")
+        return 0
+
+    if __name__ == '__main__':
+        app()
+    ```
 
 ### Test Gate
 ```bash
 pytest tests/ -v && pytest .
 ```
-
----
-
-## Phase 6: Update Entry Command (`src/commands/update_entry.py`)
-
-### Tasks
-1. **Implement update entry command**
-   ```python
-   # Run: cat > src/commands/update_entry.py << 'PYEOF' && python -m py_compile src/commands/update_entry.py
-   import sys
-   
-   def parse_args(args):
-       kwargs = {}
-       for i, arg in enumerate(args[1:], 1):
-           if '=' in arg:
-               key, val = arg.split('=', 1)
-               kwargs[key] = val
-           else:
-               kwargs[f'arg_{i}'] = arg
-       return kwargs
-   
-   def main():
-       args = parse_args(sys.argv)
-       
-       # Expect: --id=1 weight=150 reps=6
-       entry_id = int(args.get('--id', 0))
-       db = DB()
-       db.update_entry(entry_id, **{k.replace('--',''): v for k,v in args.items() if k.startswith('--')})
-       print(f"Updated entry {entry_id}")
-   
-   if __name__ == '__main__':
-       main()
-   ```
-
-### Test Gate
-```bash
-pytest tests/ -v && pytest .
 ```
 
 ---
@@ -349,19 +258,20 @@ pytest tests/ -v && pytest .
 ## Phase 7: Analysis Queries (Scaffold)
 
 ### Tasks
-1. **Create analysis module scaffold**
-   ```python
-   # Run: mkdir -p src/analysis && cat > src/analysis/__init__.py << 'PYEOF'
-   """Analysis utilities for grouped queries."""
-   
-   def group_by(db, column):
-       """Placeholder for future group-by analysis."""
-       pass
-   
-   def performance_per_program(db):
-       """Placeholder for per-program stats."""
-       pass
-   ```
+1. **Create analysis module scaffold** (LiftEntry aggregation → pure functions, no CLI wiring needed yet)
+    ```python
+    # Run: mkdir -p src/analysis && cat > src/analysis/__init__.py << 'PYEOF'
+    """Analysis utilities for grouped queries."""
+    from typing import Any
+    
+    def group_by(db, column: str) -> dict[str, list[tuple]]:
+        """Pure business logic: returns typed aggregated results by column."""
+        pass
+    
+    def performance_per_program(db) -> dict[str, float]:
+        """Pure business logic: returns typed dictionary of program stats."""
+        pass
+    ```
 
 ### Test Gate
 ```bash
@@ -373,15 +283,96 @@ pytest tests/ -v && pytest .
 ## Phase 8: Integration & End-to-End
 
 ### Tasks
-1. **Verify CLI help**
+1. **Verify CLI help** (Typer auto-generates documentation)
    ```bash
-   python src/cli.py --help
+   python -m training_vid_organizer.cli --help
    ```
 
-2. **Run end-to-end test**
+2. **Run end-to-end test** (JSON config with list[LiftEntry] format, parsed → LiftEntry instances → pure function)
    ```bash
-   echo '{"date":"2026-09-23","bodyweight":85.5,"lift":"front_squat","weight":140,"reps":5,"top_set":true,"reps_in_reserve":2,"program":"531+","program_iteration":1}' > /tmp/test_session.json && python src/cli.py add session --config /tmp/test_session.json
+   echo '{"date":"2026-09-23","bodyweight":85.5,"lift":"front_squat","weight":140,"reps":5,"top_set":true,"reps_in_reserve":2,"program":"531+","program_iteration":1}' > /tmp/test_session.json && python -m training_vid_organizer.cli add session --config /tmp/test_session.json
    ```
+
+### Typer CLI Wiring Pattern (src/training_vid_organizer/cli.py)
+```python
+from typer import Typer, echo
+from src.db import DB
+from src.models import LiftEntry
+import json
+
+app = Typer(name="training-vid-organizer")
+
+@app.command()
+def add_lift(
+    date: str,
+    bodyweight: float | None = None,
+    lift: str,
+    weight: float,
+    reps: int,
+):
+    """Add a single lift entry."""
+    db = DB()
+    entry = LiftEntry(
+        date=date,
+        bodyweight=bodyweight,
+        lift=lift,
+        weight=weight,
+        reps=reps,
+    )
+    result = add_lift(db, entry)  # pure function with typed dataclass
+    echo(f"Added {result} entry/entries")
+
+@app.command()
+def add_session(config: str):
+    """Add multiple lift entries from JSON config."""
+    db = DB()
+    with open(config) as f:
+        data = json.load(f)  # list[LiftEntry] dicts
+    
+    # Convert dicts to LiftEntry instances (or pass directly if using dict[str, Any])
+    entries = [LiftEntry(**d) for d in data]
+    
+    result = add_session(db, entries)  # pure function with typed list[LiftEntry]
+    echo(f"Added {result} entry/entries")
+
+@app.command()
+def list_videos(lift: str | None = None):
+    """List training videos."""
+    db = DB()
+    
+    if lift is not None:
+        results = list_videos(db, {'lift': lift})  # type: ignore[union-attr]
+    else:
+        results = list_videos(db)
+    
+    print(f"\n{'ID':<5} {'Date':<12} {'Lift':<18} {'Weight':<7} {'Reps':<6}")
+    for row in results:
+        print(f"{row[0]:<5} {row[1]:<12} {row[3]:<18} {row[4]:<7} {row[5]:<6}")
+
+@app.command()
+def update_entry(entry_id: int, **kwargs: str):
+    """Update a lift entry by ID."""
+    db = DB()
+    
+    if '--id' not in kwargs:
+        print("Error: --id is required")
+        return 1
+    
+    try:
+        entry_id = int(kwargs['--id'])  # type: ignore[union-attr]
+    except ValueError:
+        print("Error: --id must be an integer")
+        return 1
+    
+    updates = {k.replace('--',''): v for k,v in kwargs.items() if k.startswith('--')}  # type: ignore[union-attr]
+    
+    result = update_entry(db, entry_id, updates)  # pure function with patch dict
+    echo(f"Updated entry {entry_id}")
+    return 0
+
+if __name__ == '__main__':
+    app()
+```
 
 ### Test Gate
 ```bash
@@ -397,3 +388,12 @@ ralph_loop "Implement training video organizer CLI: execute Phase 1-8 tasks sequ
 ```
 
 Each task is single-command executable, stateless, and verifiable.
+
+### Architecture Decisions (Locked)
+- **Data model**: `LiftEntry` dataclass in `src/training_vid_organizer/db.py`; all commands return typed results, no side effects
+- **Session format**: `list[LiftEntry]` instead of separate `SessionConfig`; validation applied to list before insertion
+- **Database lifecycle**: Dependency injection pattern (DB instance passed as parameter); module-level singleton deferred for testability
+- **CLI integration**: Typer subcommands with explicit options (`--lift`, `--program`, etc.); no auto-increment for program_iteration
+- **Error handling**: Omitted from initial implementation; to be added in Phase 5+ as structured error classes
+- **Type safety**: All function signatures use explicit type hints throughout; mypy verification required before merge
+

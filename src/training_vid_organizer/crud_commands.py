@@ -1,9 +1,10 @@
 """Pure CRUD command functions for database operations."""
 
-from typing import Optional, Iterable
+from collections.abc import Iterable
+from typing import Optional
 
-from src.db import DB
 from src.models import LiftEntry
+from training_vid_organizer.db_handling.db import DB
 
 
 def add_lift(db: "DB", entry: LiftEntry) -> int:
@@ -17,6 +18,7 @@ def add_lift(db: "DB", entry: LiftEntry) -> int:
         Number of rows inserted (0 on error)
     """
     from src.training_vid_organizer.db_operations import db_add_lift
+
     return db_add_lift(db, entry)
 
 
@@ -31,10 +33,11 @@ def add_session(db: "DB", entries: Iterable[LiftEntry]) -> int:
         Number of rows inserted (0 on error)
     """
     from src.training_vid_organizer.db_operations import add_session as _add_session
+
     return _add_session(db, entries)
 
 
-def list_videos(db: "DB", filters: Optional[dict] = None) -> Iterable[tuple]:
+def list_videos(db: "DB", filters: dict | None = None) -> Iterable[tuple]:
     """List training videos with optional filters.
 
     Args:
@@ -45,14 +48,13 @@ def list_videos(db: "DB", filters: Optional[dict] = None) -> Iterable[tuple]:
         Iterable of tuples containing row data
     """
     from src.training_vid_organizer.db_operations import list_videos as _list_videos
+
     if filters is not None:
         return _list_videos(db, filters)  # type: ignore[union-attr]
     return _list_videos(db)
 
 
-def update_entry(
-    db: "DB", entry_id: int, updates: dict[str, object]
-) -> int:
+def update_entry(db: "DB", entry_id: int, updates: dict[str, object]) -> int:
     """Update a lift entry by ID.
 
     Args:
@@ -64,4 +66,5 @@ def update_entry(
         Number of rows updated (0 on error or no match)
     """
     from src.training_vid_organizer.db_operations import update_entry as _update_entry
+
     return _update_entry(db, entry_id, updates)  # type: ignore[union-attr]

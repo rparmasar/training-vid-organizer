@@ -1,7 +1,26 @@
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 
+@dataclass
+class LiftEntry:
+    """Represents a single lift entry in the lifts table in the database."""
+
+    date: str
+    bodyweight: float | None = None
+    lift: str = ""
+    weight: int = 0
+    reps: int = 0
+    program: str
+    program_iteration: int
+    top_set: bool = False
+    warm_up_set: bool = False
+    reps_in_reserve: int | None = None
+    filepath: str | None = None
+
+
+# TODO: convert to pure functions that take a connection object (or a path to db, and have CLI function handle connection management)
 class DB:
     def __init__(self, db_path="db/training.db"):
         self.path = db_path
@@ -15,6 +34,7 @@ class DB:
             conn.close()
 
     def init_schema(self):
+        # TODO: this should use `LiftEntry` to generate the SQL statements for creating the table
         with self.connection() as conn:
             c = conn.cursor()
             c.execute("""CREATE TABLE IF NOT EXISTS lifts (
@@ -30,12 +50,14 @@ class DB:
                 program TEXT,
                 program_iteration INTEGER
             )""")
+            # TODO: date should be a proper date type for indexing
             c.execute("CREATE INDEX IF NOT EXISTS idx_lifts_date ON lifts(date)")
             conn.commit()
 
     def add_lift_entry(self, **kwargs):
         with self.connection() as conn:
             c = conn.cursor()
+            # TODO: same, use LiftEntry to generate sql here
             c.execute(
                 """INSERT INTO lifts 
                 (date,bodyweight,lift,weight,reps,top_set,reps_in_reserve,filepath,program,program_iteration)
@@ -123,83 +145,3 @@ class DB:
                       WHERE id=?"""
             c.execute(sql, (entry_id,))
             conn.commit()
-
-
-def add_lift(db: DB, entry) -> int:
-    """Pure function to add a single lift entry.
-
-    Args:
-        db: Database instance
-        entry: LiftEntry dataclass instance with typed fields
-
-    Returns:
-        ID of inserted row (or 0 on error)
-    """
-    try:
-        with db.connection() as conn:
-            c = conn.cursor()
-            placeholders = ",".join(["?" for _ in range(5)])
-            cols = ", ".join(
-                ["date", "bodyweight", "lift", "weight", "reps"]
-            )
-            values = (
-                entry.date,
-                entry.bodyweight,
-                entry.lift,
-                entry.weight,
-                entry.reps,
-            )
-            c.execute(f"INSERT INTO lifts ({cols}) VALUES ({placeholders})", values)
-            conn.commit()
-            return c.lastrowid or 0
-    except Exception:
-        return 0
-
-
-def add_session(db: DB, entries) -> int:
-    """Pure function to add multiple lift entries from a session.
-
-    Args:
-        db: Database instance
-        entries: List of LiftEntry dataclass instances (or dicts with same fields)
-
-    Returns:
-        Number of rows inserted (0 on error)
-    """
-    try:
-        if not entries:
-            return 0
-
-        with db.connection() as conn:
-            c = conn.cursor()
-            cols = ", ".join(
-                ["date", "bodyweight", "lift", "weight", "reps"]
-            )
-            placeholders = ",".join(["?" for _ in range(len(entries[0]))])
-
-            # Handle both LiftEntry instances and dicts
-            data_list = []
-            for entry in entries:
-                if hasattr(entry, "__dataclass_fields__"):  # LiftEntry instance
-                    data_list.append(
-                        (entry.date, entry.bodyweight, entry.lift, entry.weight, entry.reps)
-                    )
-                else:  # dict
-                    data_list.append(
-                        (
-                            entry.get("date"),
-                            entry.get("bodyweight"),
-                            entry.get("lift"),
-                            entry.get("weight"),
-                            entry.get("reps"),
-                        )
-                    )
-
-            c.executemany(
-                f"INSERT INTO lifts ({cols}) VALUES ({placeholders})", data_list
-            )
-            conn.commit()
-            return len(data_list)
-    except Exception:
-        return 0
-

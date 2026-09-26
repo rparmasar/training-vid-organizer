@@ -1,14 +1,7 @@
 """CLI entry point using Typer."""
 
-from pathlib import Path
-from typing import Optional, Union
-
 from typer import Argument, Exit, Option, Typer, echo
 
-"""CLI entry point using Typer."""
-
-
-from src.db import DB
 from src.models import LiftEntry
 from src.training_vid_organizer.crud_commands import (
     add_lift as _add_lift,
@@ -23,6 +16,7 @@ from src.training_vid_organizer.crud_commands import (
     update_entry as _update_entry,
 )
 from training_vid_organizer.__init__ import __version__
+from training_vid_organizer.db_handling.db import DB
 
 app = Typer(
     name="training-vid-organizer",
@@ -41,60 +35,7 @@ def callback(
         echo(f"training-vid-organizer v{__version__}")
 
 
-@app.command()
-def search(
-    path: str = Argument("...", help="Path to search in (default: current directory)."),
-    tags: list[str] | None = Option(None, "--tags", "-t", help="Filter by tags."),
-    min_duration: float | None = Option(
-        None, "--min-duration", "-d", help="Minimum duration in seconds."
-    ),
-):
-    """Search videos by path and optional criteria."""
-    search_path = Path(path).expanduser().resolve()
-
-    if not search_path.exists():
-        raise Exit(1)
-
-    echo(f"Searching in: {search_path}")
-    # TODO: Implement actual search logic
-    echo("Search functionality coming soon...")
-
-
-@app.command()
-def categorize(
-    tags: list[str] = Argument(..., help="Tags to assign."),
-    output_dir: str = Option(
-        "videos", "--output-dir", "-o", help="Output directory for organized videos."
-    ),
-):
-    """Categorize videos with given tags."""
-    if not tags:
-        raise Exit(1)
-
-    echo(f"Categorizing videos with tags: {', '.join(tags)}")
-    # TODO: Implement actual categorization logic
-    echo("Categorization functionality coming soon...")
-
-
-@app.command()
-def metadata(
-    path: str = Argument(..., help="Path to video file."),
-    extract_duration: bool = Option(
-        False, "--duration", "-D", help="Extract and display duration."
-    ),
-):
-    """Extract video metadata."""
-    video_path = Path(path).expanduser().resolve()
-
-    if not video_path.exists():
-        raise Exit(1)
-
-    # TODO: Implement actual metadata extraction logic
-    echo(f"Metadata for: {video_path}")
-    if extract_duration:
-        echo("Duration functionality coming soon...")
-
-
+# TODO: convert back to Annotated style
 @app.command()
 def add_lift(
     db_path: str = Option("db/training.db", "--db-path", "-d"),
@@ -119,6 +60,7 @@ def add_lift(
     echo(f"Added {result} entry/entries")
 
 
+# TODO: convert back to Annotated style
 @app.command()
 def add_session(
     db_path: str = Option("db/training.db", "--db-path", "-d"),
@@ -139,6 +81,7 @@ def add_session(
     echo(f"Added {result} entry/entries")
 
 
+# TODO: convert back to Annotated style
 @app.command()
 def list_videos(
     db_path: str = Option("db/training.db", "--db-path", "-d"),
@@ -158,6 +101,7 @@ def list_videos(
         print(f"{row[0]:<5} {row[1]:<12} {row[3]:<18} {row[4]:<7} {row[5]:<6}")
 
 
+# TODO: convert back to Annotated style
 @app.command()
 def update_entry(
     db_path: str = Option("db/training.db", "--db-path", "-d"),

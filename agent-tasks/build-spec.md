@@ -110,7 +110,8 @@ tests/test_schema.py::test_schema_creation PASSED                       [ 100%]
 1. **Implement add lift command** (Typer parses args → creates LiftEntry dataclass → passes to pure function)
     ```python
     # Run: cat > src/training_vid_organizer/cli.py << 'PYEOF' && python -m py_compile src/training_vid_organizer/cli.py
-    from typer import Typer, echo
+    from typing import Annotated
+    from typer import Typer, echo, Option, Argument
     from src.db import DB
     from src.models import LiftEntry
 
@@ -118,11 +119,11 @@ tests/test_schema.py::test_schema_creation PASSED                       [ 100%]
 
     @app.command()
     def add_lift(
-        date: str,
-        bodyweight: float | None = None,
-        lift: str,
-        weight: float,
-        reps: int,
+        date: str = Argument(..., help="Date of the lift (YYYY-MM-DD)."),
+        bodyweight: Annotated[float | None, Option(None, "--bodyweight", "-w", help="Body weight in kg.")] = None,
+        lift: str = Argument(..., help="Type of lift (e.g., front_squat)."),
+        weight: float = Argument(..., help="Weight lifted in kg."),
+        reps: int = Argument(..., help="Number of repetitions."),
     ):
         """Add a single lift entry."""
         db = DB()
@@ -156,8 +157,10 @@ pytest tests/ -v && pytest .
     import json
 
     @app.command()
-    def add_session(config: str):
-        """Add multiple lift entries from JSON config."""
+    def add_session(
+        config: str = Argument(..., help="Path to JSON configuration file."),
+    ):
+        """Add multiple lift entries from a JSON session config."""
         db = DB()
         with open(config) as f:
             data = json.load(f)  # list[LiftEntry] dicts
@@ -185,12 +188,15 @@ pytest tests/ -v && pytest .
 1. **Implement list videos command** (Typer parses args → filters dict → pure function query)
     ```python
     # Run: cat >> src/training_vid_organizer/cli.py << 'PYEOF' && python -m py_compile src/training_vid_organizer/cli.py
-    from typing import Any
+    from typing import Annotated, Any
 
     @app.command()
-    def list_videos(lift: str | None = None):
+    def list_videos(
+        db_path: str = Option("db/training.db", "--db-path", "-d", help="Path to SQLite database."),
+        lift: Annotated[str | None, Option(None, "--lift", "-l", help="Filter by lift type.")] = None,
+    ):
         """List training videos."""
-        db = DB()
+        db = DB(db_path)
         
         if lift is not None:
             results = list_videos(db, {'lift': lift})  # type: ignore[union-attr]
@@ -200,8 +206,6 @@ pytest tests/ -v && pytest .
         print(f"\n{'ID':<5} {'Date':<12} {'Lift':<18} {'Weight':<7} {'Reps':<6}")
         for row in results:
             print(f"{row[0]:<5} {row[1]:<12} {row[3]:<18} {row[4]:<7} {row[5]:<6}")
-        
-        return 0
 
     if __name__ == '__main__':
         app()
@@ -220,28 +224,35 @@ pytest tests/ -v && pytest .
 1. **Implement update entry command** (Typer parses args → patch dict → pure function)
     ```python
     # Run: cat >> src/training_vid_organizer/cli.py << 'PYEOF' && python -m py_compile src/training_vid_organizer/cli.py
-    from typing import Any
+    from typing import Annotated, Any
 
     @app.command()
-    def update_entry(entry_id: int, **kwargs: str):
+    def update_entry(
+        entry_id: int = Argument(..., help="ID of the lift entry to update."),
+        db_path: str = Option("db/training.db", "--db-path", "-d", help="Path to SQLite database."),
+        date: Annotated[str | None, Option(None, "--date", "-D", help="New date (YYYY-MM-DD).")] = None,
+        bodyweight: Annotated[float | None, Option(None, "--bodyweight", "-w", help="New body weight in kg.")] = None,
+        lift: Annotated[str | None, Option(None, "--lift", "-l", help="New lift type.")] = None,
+        weight: Annotated[float | None, Option(None, "--weight", "-W", help="New weight lifted in kg.")] = None,
+        reps: Annotated[int | None, Option(None, "--reps", "-R", help="New number of repetitions.")] = None,
+    ):
         """Update a lift entry by ID."""
-        db = DB()
+        db = DB(db_path)
         
-        if '--id' not in kwargs:
-            print("Error: --id is required")
-            return 1
-        
-        try:
-            entry_id = int(kwargs['--id'])  # type: ignore[union-attr]
-        except ValueError:
-            print("Error: --id must be an integer")
-            return 1
-        
-        updates = {k.replace('--',''): v for k,v in kwargs.items() if k.startswith('--')}  # type: ignore[union-attr]
+        updates = {}
+        if date is not None:
+            updates["date"] = date
+        if bodyweight is not None:
+            updates["bodyweight"] = bodyweight
+        if lift is not None:
+            updates["lift"] = lift
+        if weight is not None:
+            updates["weight"] = weight
+        if reps is not None:
+            updates["reps"] = reps
         
         result = update_entry(db, entry_id, updates)  # pure function with patch dict
         echo(f"Updated entry {entry_id}")
-        return 0
 
     if __name__ == '__main__':
         app()
@@ -295,7 +306,8 @@ pytest tests/ -v && pytest .
 
 ### Typer CLI Wiring Pattern (src/training_vid_organizer/cli.py)
 ```python
-from typer import Typer, echo
+from typing import Annotated
+from typer import Typer, echo, Option, Argument
 from src.db import DB
 from src.models import LiftEntry
 import json
@@ -304,11 +316,11 @@ app = Typer(name="training-vid-organizer")
 
 @app.command()
 def add_lift(
-    date: str,
-    bodyweight: float | None = None,
-    lift: str,
-    weight: float,
-    reps: int,
+    date: str = Argument(..., help="Date of the lift (YYYY-MM-DD)."),
+    bodyweight: Annotated[float | None, Option(None, "--bodyweight", "-w", help="Body weight in kg.")] = None,
+    lift: str = Argument(..., help="Type of lift (e.g., front_squat)."),
+    weight: float = Argument(..., help="Weight lifted in kg."),
+    reps: int = Argument(..., help="Number of repetitions."),
 ):
     """Add a single lift entry."""
     db = DB()
@@ -323,8 +335,10 @@ def add_lift(
     echo(f"Added {result} entry/entries")
 
 @app.command()
-def add_session(config: str):
-    """Add multiple lift entries from JSON config."""
+def add_session(
+    config: str = Argument(..., help="Path to JSON configuration file."),
+):
+    """Add multiple lift entries from a JSON session config."""
     db = DB()
     with open(config) as f:
         data = json.load(f)  # list[LiftEntry] dicts
@@ -336,9 +350,12 @@ def add_session(config: str):
     echo(f"Added {result} entry/entries")
 
 @app.command()
-def list_videos(lift: str | None = None):
+def list_videos(
+    db_path: str = Option("db/training.db", "--db-path", "-d", help="Path to SQLite database."),
+    lift: Annotated[str | None, Option(None, "--lift", "-l", help="Filter by lift type.")] = None,
+):
     """List training videos."""
-    db = DB()
+    db = DB(db_path)
     
     if lift is not None:
         results = list_videos(db, {'lift': lift})  # type: ignore[union-attr]
@@ -350,25 +367,32 @@ def list_videos(lift: str | None = None):
         print(f"{row[0]:<5} {row[1]:<12} {row[3]:<18} {row[4]:<7} {row[5]:<6}")
 
 @app.command()
-def update_entry(entry_id: int, **kwargs: str):
+def update_entry(
+    entry_id: int = Argument(..., help="ID of the lift entry to update."),
+    db_path: str = Option("db/training.db", "--db-path", "-d", help="Path to SQLite database."),
+    date: Annotated[str | None, Option(None, "--date", "-D", help="New date (YYYY-MM-DD).")] = None,
+    bodyweight: Annotated[float | None, Option(None, "--bodyweight", "-w", help="New body weight in kg.")] = None,
+    lift: Annotated[str | None, Option(None, "--lift", "-l", help="New lift type.")] = None,
+    weight: Annotated[float | None, Option(None, "--weight", "-W", help="New weight lifted in kg.")] = None,
+    reps: Annotated[int | None, Option(None, "--reps", "-R", help="New number of repetitions.")] = None,
+):
     """Update a lift entry by ID."""
-    db = DB()
+    db = DB(db_path)
     
-    if '--id' not in kwargs:
-        print("Error: --id is required")
-        return 1
-    
-    try:
-        entry_id = int(kwargs['--id'])  # type: ignore[union-attr]
-    except ValueError:
-        print("Error: --id must be an integer")
-        return 1
-    
-    updates = {k.replace('--',''): v for k,v in kwargs.items() if k.startswith('--')}  # type: ignore[union-attr]
+    updates = {}
+    if date is not None:
+        updates["date"] = date
+    if bodyweight is not None:
+        updates["bodyweight"] = bodyweight
+    if lift is not None:
+        updates["lift"] = lift
+    if weight is not None:
+        updates["weight"] = weight
+    if reps is not None:
+        updates["reps"] = reps
     
     result = update_entry(db, entry_id, updates)  # pure function with patch dict
     echo(f"Updated entry {entry_id}")
-    return 0
 
 if __name__ == '__main__':
     app()

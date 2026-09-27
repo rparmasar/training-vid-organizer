@@ -55,7 +55,7 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [project.scripts]
-training-vid-organizer = "training_vid_organizer.cli:app"
+tvo = "training_vid_organizer.cli:app"
 
 [build-system]
 requires = ["hatchling"]

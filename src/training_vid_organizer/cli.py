@@ -18,6 +18,7 @@ from typer import Argument, Exit, Option, Typer, echo
 #     update_entry as _update_entry,
 # )
 from training_vid_organizer.__init__ import __version__
+from training_vid_organizer.db_handling.db import init_database
 
 # from training_vid_organizer.db_handling.db import DB
 
@@ -30,11 +31,23 @@ app = Typer(
 
 @app.callback(invoke_without_command=True)
 def callback(
-    version: Annotated[bool, Option("--version", "-v")],
+    version: Annotated[bool, Option("--version", "-v")] = False,
 ):
     """Main callback for the CLI."""
     if version:
         echo(f"training-vid-organizer v{__version__}")
+
+
+@app.command("init")
+def init_db(
+    db_path: Annotated[str, Option("--db-path", "-d")] = "db/training.db",
+):
+    """initializes the database to store lift information"""
+    echo(f"creating training log database in {db_path=}")
+
+    init_database(db_path=db_path)
+
+    echo("database created successfully!")
 
 
 # TODO: convert back to Annotated style

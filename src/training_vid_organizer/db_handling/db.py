@@ -1,5 +1,4 @@
 import sqlite3
-from contextlib import contextmanager
 from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
@@ -12,14 +11,89 @@ class LiftEntry:
     date: str
     program: str
     program_iteration: int
+    lift: str
+    weight: int
+    reps: int
     bodyweight: float | None = None
-    lift: str = ""
-    weight: int = 0
-    reps: int = 0
     top_set: bool = False
     warm_up_set: bool = False
     reps_in_reserve: int | None = None
     filepath: str | None = None
+
+
+def _get_sql_type(annotation: Any, default: Any) -> str:
+    """Determine the SQLite column type from a Python annotation."""
+    if annotation is None:
+        return "TEXT"
+
+    # Handle union types (e.g., float | None)
+    origin = getattr(annotation, "__origin__", None)
+    if (
+        origin is not None
+        and hasattr(origin, "__name__")
+        and origin.__name__ in ("Union", "Optional")
+    ):
+        args = annotation.__args__
+        if len(args) == 2 and args[1] is type(None):
+            return _get_sql_type(args[0], default)
+
+    # Handle basic types
+    if annotation in (int, float):
+        return "REAL"
+    if annotation is bool:
+        return "INTEGER"
+    if annotation is str:
+        return "TEXT"
+    if annotation is bytes:
+        return "BLOB"
+
+    # Default to TEXT for unknown types
+    return "TEXT"
+
+
+def _format_default(value: Any) -> str | None:
+    """Format a default value as SQL."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        # Escape single quotes in strings
+        escaped = value.replace("'", "''")
+        return f"'{escaped}'"
+    return None
+
+
+def add_lift_entry(db_path: str, entry_dict: dict[str, Any]) -> int:
+    """Insert a lift entry into the database.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        entry_dict: Dictionary containing lift entry data matching LiftEntry fields.
+
+    Returns:
+        Number of rows affected (should be 1).
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+
+        # Build INSERT statement dynamically from the provided dictionary
+        columns = list(entry_dict.keys())
+        placeholders = ", ".join(["?" for _ in columns])
+        col_names = ", ".join(columns)
+
+        values = [entry_dict[col] for col in columns]
+
+        insert_sql = f"INSERT INTO lifts ({col_names}) VALUES ({placeholders})"
+        cursor.execute(insert_sql, values)
+        conn.commit()
+
+        return cursor.rowcount
+    finally:
+        conn.close()
 
 
 def init_database(db_path: str | Path) -> None:
@@ -56,48 +130,3 @@ def init_database(db_path: str | Path) -> None:
         print(f"successfully created lifts table in database at {db_path=}")
     finally:
         conn.close()
-
-
-def _get_sql_type(annotation: Any, default: Any) -> str:
-    """Determine the SQLite column type from a Python annotation."""
-    if annotation is None or annotation == type(None):
-        return "TEXT"
-
-    # Handle union types (e.g., float | None)
-    origin = getattr(annotation, "__origin__", None)
-    if (
-        origin is not None
-        and hasattr(origin, "__name__")
-        and origin.__name__ in ("Union", "Optional")
-    ):
-        args = annotation.__args__
-        if len(args) == 2 and args[1] is type(None):
-            return _get_sql_type(args[0], default)
-
-    # Handle basic types
-    if annotation in (int, float):
-        return "REAL"
-    if annotation == bool:
-        return "INTEGER"
-    if annotation == str:
-        return "TEXT"
-    if annotation == bytes:
-        return "BLOB"
-
-    # Default to TEXT for unknown types
-    return "TEXT"
-
-
-def _format_default(value: Any) -> str | None:
-    """Format a default value as SQL."""
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return "1" if value else "0"
-    if isinstance(value, (int, float)):
-        return str(value)
-    if isinstance(value, str):
-        # Escape single quotes in strings
-        escaped = value.replace("'", "''")
-        return f"'{escaped}'"
-    return None

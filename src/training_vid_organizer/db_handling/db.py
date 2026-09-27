@@ -18,7 +18,7 @@ class LiftEntry:
     top_set: bool = False
     warm_up_set: bool = False
     reps_in_reserve: int | None = None
-    filepath: str | None = None
+    filepath: Path | None = None
 
 
 def _get_sql_type(annotation: Any, default: Any) -> str:
@@ -102,26 +102,27 @@ def init_database(db_path: str | Path) -> None:
         conn.close()
 
 
-def add_lift_entry(db_path: str, entry_dict: dict[str, Any]) -> int:
+def add_lift_entry(db_path: str, entry: LiftEntry) -> int:
     """Insert a lift entry into the database.
 
     Args:
         db_path: Path to the SQLite database file.
-        entry_dict: Dictionary containing lift entry data matching LiftEntry fields.
+        entry: LiftEntry containing lift entry data matching LiftEntry fields.
 
     Returns:
         Number of rows affected (should be 1).
     """
+    # Convert LiftEntry to dict for dynamic column handling
+    columns = {f.name: getattr(entry, f.name) for f in fields(LiftEntry)}
+
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
 
-        # Build INSERT statement dynamically from the provided dictionary
-        columns = list(entry_dict.keys())
+        # Build INSERT statement dynamically from LiftEntry fields
+        col_names = ", ".join(columns.keys())
         placeholders = ", ".join(["?" for _ in columns])
-        col_names = ", ".join(columns)
-
-        values = [entry_dict[col] for col in columns]
+        values = list(columns.values())
 
         insert_sql = f"INSERT INTO lifts ({col_names}) VALUES ({placeholders})"
         cursor.execute(insert_sql, values)

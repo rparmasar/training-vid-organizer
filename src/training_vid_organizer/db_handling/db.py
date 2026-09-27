@@ -66,7 +66,7 @@ def _format_default(value: Any) -> str | None:
     return None
 
 
-def init_database(db_path: str | Path) -> None:
+def init_database(db_path: Path) -> None:
     """Initialize the SQLite database with the lifts table.
 
     Args:
@@ -102,7 +102,7 @@ def init_database(db_path: str | Path) -> None:
         conn.close()
 
 
-def add_lift_entry(db_path: str, entry: LiftEntry) -> int:
+def add_lift_entry(db_path: Path, entry: LiftEntry) -> int:
     """Insert a lift entry into the database.
 
     Args:
@@ -129,5 +129,47 @@ def add_lift_entry(db_path: str, entry: LiftEntry) -> int:
         conn.commit()
 
         return cursor.rowcount
+    finally:
+        conn.close()
+
+
+def add_session_entry(db_path: Path, entries: list[LiftEntry]) -> int:
+    """Insert multiple lift entries into the database.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        entries: List of LiftEntry objects (already parsed from JSON at CLI layer).
+
+    Returns:
+        Total number of rows affected.
+
+    Raises:
+        TypeError: If entries is not a list or contains non-LiftEntry items.
+        ValueError: If database write fails.
+    """
+    # Validate input type immediately
+    if not isinstance(entries, list):
+        raise TypeError("entries must be a list of LiftEntry objects")
+
+    # Empty list is valid - return 0 without DB access
+    if not entries:
+        return 0
+
+    # Batch insert with executemany (single connection)
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+
+        col_names = ", ".join(f.name.lower() for f in fields(LiftEntry))
+        placeholders = ", ".join(["?" for _ in fields(LiftEntry)])
+        values_list = [tuple(getattr(e, f.name) for f in fields(LiftEntry)) for e in entries]
+
+        insert_sql = f"INSERT INTO lifts ({col_names}) VALUES ({placeholders})"
+        cursor.executemany(insert_sql, values_list)
+        conn.commit()
+
+        return cursor.rowcount
+    except sqlite3.Error as e:
+        raise ValueError(f"Database error while inserting {len(entries)} entries: {e}") from e
     finally:
         conn.close()

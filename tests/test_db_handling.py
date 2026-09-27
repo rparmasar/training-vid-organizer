@@ -1,8 +1,11 @@
 from src.training_vid_organizer.db_handling.db import (
     init_database,
     add_lift_entry,
+    add_session_entry,
     LiftEntry,
 )
+
+import json
 
 
 def test_init_database_works(tmpdir):
@@ -29,3 +32,35 @@ def test_add_lift_entry_works(tmpdir):
 
     # exactly one row should be affected
     assert OBSERVED_OUTPUT == 1
+
+
+def test_add_session_entry_works(tmpdir):
+    # initialize temp db
+    init_database(tmpdir / "test.db")
+
+    # sample session (list of entries)
+    INPUT_SESSION = [
+        LiftEntry(
+            date="2023-04-01",
+            program="P9",
+            program_iteration=1,
+            lift="Bicep Curl",
+            weight=85,
+            reps=4,
+        ),
+        LiftEntry(
+            date="2024-04-01",
+            program="P9",
+            program_iteration=1,
+            lift="Tricep Curl",
+            weight=85,
+            reps=4,
+        ),
+    ]
+
+    # call fn
+    OBSERVED_OUTPUT = add_session_entry(tmpdir / "test.db", INPUT_SESSION)
+
+    # two rows should be affected
+    assert OBSERVED_OUTPUT == 2
+

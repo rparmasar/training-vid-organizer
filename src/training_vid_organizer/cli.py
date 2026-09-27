@@ -1,5 +1,6 @@
 """CLI entry point using Typer."""
 
+import json
 import os
 from pathlib import Path
 from typing import Annotated
@@ -11,6 +12,7 @@ from training_vid_organizer.__init__ import __version__
 from training_vid_organizer.db_handling.db import (
     LiftEntry,
     add_lift_entry,
+    add_session_entry,
     init_database,
 )
 from training_vid_organizer.utils import get_config_paths
@@ -84,19 +86,23 @@ def add_lift(
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
     # convert args to LiftEntry
-    current_lift_entry = LiftEntry(
-        date,
-        program,
-        program_iteration,
-        lift,
-        weight,
-        reps,
-        bodyweight,
-        top_set,
-        warm_up_set,
-        reps_in_reserve,
-        filepath,
-    )
+    try:
+        current_lift_entry = LiftEntry(
+            date,
+            program,
+            program_iteration,
+            lift,
+            weight,
+            reps,
+            bodyweight,
+            top_set,
+            warm_up_set,
+            reps_in_reserve,
+            filepath,
+        )
+    except (TypeError, ValueError) as e:
+        echo(f"Error creating lift entry: {e}")
+        raise typer.Exit(code=1)
 
     # add via function
     rows_updated = add_lift_entry(db_path=effective_db_path, entry=current_lift_entry)
@@ -110,9 +116,34 @@ def add_lift(
 @add_group.command("session")
 def add_session(
     config_path: Annotated[str, Argument(help="Path to JSON configuration file")] = "",
+    db_path: Annotated[str, Option("--db-path", "-d")] = None,
 ):
     """Add multiple lifts from a JSON configuration file."""
-    echo(f"Loading session data from {config_path=}")
+    # allow per-command override
+    effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
+
+    # load and parse JSON
+    with open(config_path) as f:
+        session_data = json.load(f)
+
+    if not isinstance(session_data, list):
+        echo("Error: JSON root must be a list of lift entries")
+        raise typer.Exit(code=1)
+
+    # convert dicts to LiftEntry objects
+    try:
+        entries = [LiftEntry(**entry_dict) for entry_dict in session_data]
+    except (TypeError, ValueError) as e:
+        echo(f"Error parsing lift entries: {e}")
+        raise typer.Exit(code=1)
+
+    # add via function
+    rows_updated = add_session_entry(db_path=effective_db_path, entries=entries)
+
+    if rows_updated == len(entries):
+        echo(f"added {rows_updated} entries from {config_path=} to the database!")
+    else:
+        echo(f"failed to add all {len(entries)} entries ({rows_updated}/{len(entries)})")
 
 
 @list_group.command("config")

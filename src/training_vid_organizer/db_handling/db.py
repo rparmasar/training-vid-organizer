@@ -66,36 +66,6 @@ def _format_default(value: Any) -> str | None:
     return None
 
 
-def add_lift_entry(db_path: str, entry_dict: dict[str, Any]) -> int:
-    """Insert a lift entry into the database.
-
-    Args:
-        db_path: Path to the SQLite database file.
-        entry_dict: Dictionary containing lift entry data matching LiftEntry fields.
-
-    Returns:
-        Number of rows affected (should be 1).
-    """
-    conn = sqlite3.connect(db_path)
-    try:
-        cursor = conn.cursor()
-
-        # Build INSERT statement dynamically from the provided dictionary
-        columns = list(entry_dict.keys())
-        placeholders = ", ".join(["?" for _ in columns])
-        col_names = ", ".join(columns)
-
-        values = [entry_dict[col] for col in columns]
-
-        insert_sql = f"INSERT INTO lifts ({col_names}) VALUES ({placeholders})"
-        cursor.execute(insert_sql, values)
-        conn.commit()
-
-        return cursor.rowcount
-    finally:
-        conn.close()
-
-
 def init_database(db_path: str | Path) -> None:
     """Initialize the SQLite database with the lifts table.
 
@@ -128,5 +98,35 @@ def init_database(db_path: str | Path) -> None:
         cursor.execute(create_table_sql)
         conn.commit()
         print(f"successfully created lifts table in database at {db_path=}")
+    finally:
+        conn.close()
+
+
+def add_lift_entry(db_path: str, entry_dict: dict[str, Any]) -> int:
+    """Insert a lift entry into the database.
+
+    Args:
+        db_path: Path to the SQLite database file.
+        entry_dict: Dictionary containing lift entry data matching LiftEntry fields.
+
+    Returns:
+        Number of rows affected (should be 1).
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+
+        # Build INSERT statement dynamically from the provided dictionary
+        columns = list(entry_dict.keys())
+        placeholders = ", ".join(["?" for _ in columns])
+        col_names = ", ".join(columns)
+
+        values = [entry_dict[col] for col in columns]
+
+        insert_sql = f"INSERT INTO lifts ({col_names}) VALUES ({placeholders})"
+        cursor.execute(insert_sql, values)
+        conn.commit()
+
+        return cursor.rowcount
     finally:
         conn.close()

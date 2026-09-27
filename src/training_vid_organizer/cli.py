@@ -4,29 +4,15 @@ from typing import Annotated
 
 from typer import Argument, Exit, Option, Typer, echo
 
-# from src.models import LiftEntry
-# from src.training_vid_organizer.crud_commands import (
-#     add_lift as _add_lift,
-# )
-# from src.training_vid_organizer.crud_commands import (
-#     add_session as _add_session,
-# )
-# from src.training_vid_organizer.crud_commands import (
-#     list_videos as _list_videos,
-# )
-# from src.training_vid_organizer.crud_commands import (
-#     update_entry as _update_entry,
-# )
 from training_vid_organizer.__init__ import __version__
 from training_vid_organizer.db_handling.db import init_database
-
-# from training_vid_organizer.db_handling.db import DB
 
 app = Typer(
     name="training-vid-organizer",
     help="A CLI tool for organizing training videos.",
     add_completion=False,
 )
+add_group = Typer(name="add", help="Add training data")
 
 
 @app.callback(invoke_without_command=True)
@@ -48,6 +34,31 @@ def init_db(
     init_database(db_path=db_path)
 
     echo("database created successfully!")
+
+
+@add_group.command("lift")
+def add_lift(
+    date: Annotated[str, Option("--date")] = "",
+    program: Annotated[str, Option("--program")] = "",
+    program_iteration: Annotated[int, Option("--iteration", "-i")] = 1,
+    lift_name: Annotated[str, Option("--lift", "-l")] = "Bench Press",
+    weight: Annotated[int, Option("--weight", "-w")] = 0,
+    reps: Annotated[int, Option("--reps", "-r")] = 0,
+    bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
+):
+    """Add a single lift entry."""
+    echo(f"Adding lift: {lift_name} - {weight} x {reps}")
+
+
+@add_group.command("session")
+def add_session(
+    config_path: Annotated[str, Argument(help="Path to JSON configuration file")] = "",
+):
+    """Add multiple lifts from a JSON configuration file."""
+    echo(f"Loading session data from {config_path=}")
+
+
+app.add_typer(add_group)
 
 
 if __name__ == "__main__":

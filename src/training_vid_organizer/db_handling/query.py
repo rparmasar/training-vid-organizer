@@ -2,13 +2,14 @@
 
 import sqlite3
 from dataclasses import fields
+from pathlib import Path
 from typing import Any
 
 from .db import LiftEntry
 
 
 def fetch_lifts(
-    db_path: str,
+    db_path: Path,
     filters: dict[str, Any],
     limit: int | None = 100,
 ) -> list[LiftEntry]:

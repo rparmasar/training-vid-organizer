@@ -45,7 +45,8 @@ def test_cli_add_lift_works(runner, tmpdir):
     # assert success
     assert result.exit_code == 0
     assert "added" in result.output
-    
+
+   
 def test_cli_add_session_works(runner, tmpdir):
     """test that we can add a session to the db using the cli and a json file"""
     # init db first
@@ -89,3 +90,395 @@ def test_cli_add_session_works(runner, tmpdir):
     # assert success
     assert result.exit_code == 0
     assert "added" in result.output.lower()
+
+
+def test_cli_list_lifts_works(runner, tmpdir):
+    """test that we can list lifts from the db using the cli"""
+    # init db first
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # add some test entries
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bicep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Tricep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bicep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    # call cli to list lifts with --top-set filter
+    result = runner.invoke(
+        app,
+        [
+            "list",
+            "lifts",
+            "--db-path",
+            tmpdir / "test.db",
+        ],
+    )
+
+    # assert success and output contains expected data
+    assert result.exit_code == 0
+    assert "bicep curl" in result.output.lower()
+    assert "tricep curl" in result.output.lower()
+
+
+def test_cli_list_lifts_with_filter(runner, tmpdir):
+    """test that we can filter lifts using the cli"""
+    # init db first
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # add some test entries with different programs
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bicep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "Push/Pull/Legs",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bench Press",
+            "--weight",
+            "100",
+            "--reps",
+            "5",
+        ],
+    )
+
+    # call cli to list lifts filtered by program
+    result = runner.invoke(
+        app,
+        [
+            "list",
+            "lifts",
+            "--db-path",
+            tmpdir / "test.db",
+            "--program",
+            "P9",
+        ],
+    )
+
+    # assert success and output contains only P9 lifts
+    assert result.exit_code == 0
+    assert "bicep curl" in result.output.lower()
+    assert "bench press" not in result.output.lower()
+
+
+def test_cli_list_lifts_no_results(runner, tmpdir):
+    """test that we get a proper message when no lifts match the filter"""
+    # init db first
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # add some entries with program P9
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bicep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    # call cli with a filter that won't match anything
+    result = runner.invoke(
+        app,
+        [
+            "list",
+            "lifts",
+            "--db-path",
+            tmpdir / "test.db",
+            "--program",
+            "NonExistentProgram",
+        ],
+    )
+
+    # assert success and proper message
+    assert result.exit_code == 0
+    assert "no lifts found" in result.output.lower()
+
+
+def test_cli_list_lifts_with_date_filter(runner, tmpdir):
+    """test that we can filter lifts by date using the cli"""
+    # init db first
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # add entries on different dates
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bicep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-05-15",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Tricep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    # call cli to list lifts filtered by exact date (April 2023)
+    result = runner.invoke(
+        app,
+        [
+            "list",
+            "lifts",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+        ],
+    )
+
+    # assert success and output contains only April lifts
+    assert result.exit_code == 0
+    assert "bicep curl" in result.output.lower()
+    assert "tricep curl" not in result.output.lower()
+
+
+def test_cli_list_lifts_with_top_set_filter(runner, tmpdir):
+    """test that we can filter lifts by top_set flag using the cli"""
+    # init db first
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # add entries with different flags
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bicep Curl",
+            "--weight",
+            "85",
+            "--reps",
+            "4",
+        ],
+    )
+
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2023-04-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Bench Press",
+            "--weight",
+            "100",
+            "--reps",
+            "5",
+            "--top-set",  # top_set flag
+        ],
+    )
+
+    # call cli to list lifts filtered by top_set flag
+    result = runner.invoke(
+        app,
+        [
+            "list",
+            "lifts",
+            "--db-path",
+            tmpdir / "test.db",
+            "--top-set",  # top_set filter
+        ],
+    )
+
+    # assert success and output contains only top set lifts
+    assert result.exit_code == 0
+    assert "bench press" in result.output.lower()
+    assert "bicep curl" not in result.output.lower()
+
+
+def test_cli_list_lifts_with_limit(runner, tmpdir):
+    """test that we can limit the number of results using the cli"""
+    # init db first
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # add 5 entries
+    for i in range(1, 6):
+        runner.invoke(
+            app,
+            [
+                "add",
+                "lift",
+                "--db-path",
+                tmpdir / "test.db",
+                "--date",
+                f"2023-04-{i:02d}",
+                "--program",
+                "P9",
+                "--iteration",
+                "1",
+                "--lift",
+                f"Lift {i}",
+                "--weight",
+                str(85 + i),
+                "--reps",
+                "4",
+            ],
+        )
+
+    # call cli with limit of 2
+    result = runner.invoke(
+        app,
+        [
+            "list",
+            "lifts",
+            "--db-path",
+            tmpdir / "test.db",
+            "--limit",
+            "2",
+        ],
+    )
+
+    # assert success and output contains only 2 entries
+    assert result.exit_code == 0
+    lines = [line.strip() for line in result.output.split("\n") if line.strip()]
+    # First two lines are header + empty, so data rows start from index 2
+    data_lines = [l for l in lines[2:] if "lift" in l.lower()]
+    assert len(data_lines) == 2

@@ -2,10 +2,13 @@
 
 import json
 import os
+import sqlite3
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
+from rich.console import Console
+from rich.table import Table
 from typer import Argument, Option, Typer, echo
 
 from training_vid_organizer.__init__ import __version__
@@ -74,12 +77,12 @@ def add_lift(
     weight: Annotated[int, Option("--weight", "-w")],
     reps: Annotated[int, Option("--reps", "-r")],
     bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
-    top_set: Annotated[float | None, Option("--top_set", "-t")] = False,
-    warm_up_set: Annotated[float | None, Option("--warm_up_set", "-w")] = False,
+    top_set: Annotated[bool, Option("--top-set", "-t")] = False,
+    warm_up_set: Annotated[bool, Option("--warm-up-set", "-w")] = False,
     reps_in_reserve: Annotated[
         float | None, Option("--reps_in_reserve", "-rir")
-    ] = False,
-    filepath: Annotated[float | None, Option("--filepath", "-f")] = False,
+    ] = None,
+    filepath: Annotated[str | None, Option("--filepath", "-f")] = None,
     db_path: Annotated[str, Option("--db-path", "-d")] = None,
 ):
     """Add a single lift entry."""
@@ -144,7 +147,9 @@ def add_session(
     if rows_updated == len(entries):
         echo(f"added {rows_updated} entries from {config_path=} to the database!")
     else:
-        echo(f"failed to add all {len(entries)} entries ({rows_updated}/{len(entries)})")
+        echo(
+            f"failed to add all {len(entries)} entries ({rows_updated}/{len(entries)})"
+        )
 
 
 @list_group.command("lifts")
@@ -152,14 +157,15 @@ def list_lifts(
     date: Annotated[str | None, Option("--date")] = None,
     program: Annotated[str | None, Option("--program")] = None,
     iteration: Annotated[int | None, Option("--iteration", "-i")] = None,
+    lift: Annotated[str | None, Option("--lift", "-L")] = None,
     weight: Annotated[float | None, Option("--weight", "-w")] = None,
     bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
-    top_set: Annotated[bool | None, Option("--top_set", "-t")] = None,
-    warm_up_set: Annotated[bool | None, Option("--warm_up_set", "-w")] = None,
-    reps_in_reserve: Annotated[float | None, Option("--reps_in_reserve", "-rir")] = None,
-    min_date: Annotated[str | None, Option("--min-date")] = None,
-    max_date: Annotated[str | None, Option("--max-date")] = None,
-    date_like: Annotated[str | None, Option("--date-like")] = None,
+    top_set: Annotated[bool | None, Option("--top-set", "-t")] = None,
+    warm_up_set: Annotated[bool | None, Option("--warm-up-set", "-w")] = None,
+    reps_in_reserve: Annotated[
+        float | None, Option("--reps_in_reserve", "-rir")
+    ] = None,
+    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
     limit: Annotated[int | None, Option("--limit", "-l")] = 100,
 ):
     """List lifts from the database with optional filters."""
@@ -172,6 +178,8 @@ def list_lifts(
         filters["program"] = str(program)
     if iteration is not None:
         filters["program_iteration"] = int(iteration)
+    if lift is not None:
+        filters["lift"] = str(lift)
     if weight is not None:
         filters["weight"] = float(weight)
     if bodyweight is not None:
@@ -182,36 +190,56 @@ def list_lifts(
         filters["warm_up_set"] = bool(warm_up_set)
     if reps_in_reserve is not None:
         filters["reps_in_reserve"] = float(reps_in_reserve)
-    if min_date is not None:
-        filters["min_date"] = str(min_date)
-    if max_date is not None:
-        filters["max_date"] = str(max_date)
-    if date_like is not None:
-        filters["date_like"] = str(date_like)
 
-    # Get effective DB path (allow per-command override)
-    db_path, _ = get_config_paths(default_db_path=DB_DEFAULT)
+    # Use provided db_path or fall back to default config path
+    effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
-    # Fetch lifts with filters and limit (empty dict means no filters)
-    entries = fetch_lifts(db_path=db_path, filters=filters or {}, limit=limit)
+    try:
+        entries = fetch_lifts(
+            db_path=effective_db_path, filters=filters or {}, limit=limit
+        )
+    except sqlite3.Error as e:
+        echo(f"Database error: {e}")
+        raise typer.Exit(code=2)
 
     if not entries:
         echo("No lifts found matching the specified criteria.")
         return
 
-    # Format as table with proper alignment
+    console = Console()
+    table = Table(
+        box=None,
+        show_header=True,
+        header_style="dim",
+        expand=False,
+    )
+
+    # Column definitions with auto-width
+    table.add_column("date", style="dim", width=12)
+    table.add_column("program", style="dim", width=15)
+    table.add_column("iteration", justify="right", width=8)
+    table.add_column("lift", style="dim", width=15)
+    table.add_column("weight (kg)", justify="right", width=9)
+    table.add_column("reps", justify="right", width=6)
+    table.add_column("bw (kg)", justify="right", width=10)
+    table.add_column("type", style="dim", width=7)
 
     for entry in entries:
-        top_set_str = "Yes" if entry.top_set else "-"
-        bodyweight_str = f"{entry.bodyweight:.1f}" if entry.bodyweight is not None else "-"
-        print(
-            f"│ {entry.date:<12} │ {entry.program:<15} │ {int(entry.program_iteration):<8} │ "
-            f"{entry.lift:<15} │ {entry.weight:<9.1f} │ {entry.reps:<6} │ "
-            f"{bodyweight_str:<13} │ {top_set_str:<7}"
+        type_label = (
+            "top" if entry.top_set else ("warm-up" if entry.warm_up_set else "-")
+        )
+        table.add_row(
+            str(entry.date),
+            str(entry.program),
+            f"{int(entry.program_iteration)}",
+            str(entry.lift),
+            f"{entry.weight:.1f}",
+            f"{int(entry.reps)}",
+            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
+            type_label,
         )
 
-    # Print table footer
-    print()  # Empty line for spacing
+    console.print(table)
 
 
 if __name__ == "__main__":

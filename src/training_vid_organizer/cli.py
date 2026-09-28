@@ -15,6 +15,7 @@ from training_vid_organizer.db_handling.db import (
     add_session_entry,
     init_database,
 )
+from training_vid_organizer.db_handling.query import fetch_lifts
 from training_vid_organizer.utils import get_config_paths
 
 APP_NAME = "training-vid-organizer"
@@ -146,21 +147,71 @@ def add_session(
         echo(f"failed to add all {len(entries)} entries ({rows_updated}/{len(entries)})")
 
 
-@list_group.command("config")
-def show_config():
-    """Display current DB and video directory paths."""
-    db_path, video_dir = get_config_paths(default_db_path=DB_DEFAULT)
+@list_group.command("lifts")
+def list_lifts(
+    date: Annotated[str | None, Option("--date")] = None,
+    program: Annotated[str | None, Option("--program")] = None,
+    iteration: Annotated[int | None, Option("--iteration", "-i")] = None,
+    weight: Annotated[float | None, Option("--weight", "-w")] = None,
+    bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
+    top_set: Annotated[bool | None, Option("--top_set", "-t")] = None,
+    warm_up_set: Annotated[bool | None, Option("--warm_up_set", "-w")] = None,
+    reps_in_reserve: Annotated[float | None, Option("--reps_in_reserve", "-rir")] = None,
+    min_date: Annotated[str | None, Option("--min-date")] = None,
+    max_date: Annotated[str | None, Option("--max-date")] = None,
+    date_like: Annotated[str | None, Option("--date-like")] = None,
+    limit: Annotated[int | None, Option("--limit", "-l")] = 100,
+):
+    """List lifts from the database with optional filters."""
+    # Build filters dict from CLI arguments
+    filters: dict[str, Any] = {}
 
-    # Check which env vars are active
-    has_db_env = bool(os.getenv("TVO_DB_PATH"))
-    has_video_env = bool(os.getenv("TVO_VIDEO_DIR"))
+    if date is not None:
+        filters["date"] = str(date)
+    if program is not None:
+        filters["program"] = str(program)
+    if iteration is not None:
+        filters["program_iteration"] = int(iteration)
+    if weight is not None:
+        filters["weight"] = float(weight)
+    if bodyweight is not None:
+        filters["bodyweight"] = float(bodyweight)
+    if top_set is not None:
+        filters["top_set"] = bool(top_set)
+    if warm_up_set is not None:
+        filters["warm_up_set"] = bool(warm_up_set)
+    if reps_in_reserve is not None:
+        filters["reps_in_reserve"] = float(reps_in_reserve)
+    if min_date is not None:
+        filters["min_date"] = str(min_date)
+    if max_date is not None:
+        filters["max_date"] = str(max_date)
+    if date_like is not None:
+        filters["date_like"] = str(date_like)
 
-    echo(f"Typer App Directory: {CONFIG_DIR}")
-    echo(f"DB Path: {db_path} {'(from TVO_DB_PATH)' if has_db_env else '(default)'}")
-    if video_dir:
-        echo(
-            f"Video Dir: {video_dir} {'(from TVO_VIDEO_DIR)' if has_video_env else '(empty)'}"
+    # Get effective DB path (allow per-command override)
+    db_path, _ = get_config_paths(default_db_path=DB_DEFAULT)
+
+    # Fetch lifts with filters and limit (empty dict means no filters)
+    entries = fetch_lifts(db_path=db_path, filters=filters or {}, limit=limit)
+
+    if not entries:
+        echo("No lifts found matching the specified criteria.")
+        return
+
+    # Format as table with proper alignment
+
+    for entry in entries:
+        top_set_str = "Yes" if entry.top_set else "-"
+        bodyweight_str = f"{entry.bodyweight:.1f}" if entry.bodyweight is not None else "-"
+        print(
+            f"│ {entry.date:<12} │ {entry.program:<15} │ {int(entry.program_iteration):<8} │ "
+            f"{entry.lift:<15} │ {entry.weight:<9.1f} │ {entry.reps:<6} │ "
+            f"{bodyweight_str:<13} │ {top_set_str:<7}"
         )
+
+    # Print table footer
+    print()  # Empty line for spacing
 
 
 if __name__ == "__main__":

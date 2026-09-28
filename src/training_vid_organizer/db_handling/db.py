@@ -162,7 +162,9 @@ def add_session_entry(db_path: Path, entries: list[LiftEntry]) -> int:
 
         col_names = ", ".join(f.name.lower() for f in fields(LiftEntry))
         placeholders = ", ".join(["?" for _ in fields(LiftEntry)])
-        values_list = [tuple(getattr(e, f.name) for f in fields(LiftEntry)) for e in entries]
+        values_list = [
+            tuple(getattr(e, f.name) for f in fields(LiftEntry)) for e in entries
+        ]
 
         insert_sql = f"INSERT INTO lifts ({col_names}) VALUES ({placeholders})"
         cursor.executemany(insert_sql, values_list)
@@ -170,6 +172,8 @@ def add_session_entry(db_path: Path, entries: list[LiftEntry]) -> int:
 
         return cursor.rowcount
     except sqlite3.Error as e:
-        raise ValueError(f"Database error while inserting {len(entries)} entries: {e}") from e
+        raise ValueError(
+            f"Database error while inserting {len(entries)} entries: {e}"
+        ) from e
     finally:
         conn.close()

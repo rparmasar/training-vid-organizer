@@ -3,6 +3,7 @@
 import json
 import os
 import sqlite3
+from dataclasses import fields
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -214,15 +215,40 @@ def list_lifts(
         expand=False,
     )
 
-    # Column definitions with auto-width
-    table.add_column("date", style="dim", width=12)
-    table.add_column("program", style="dim", width=15)
-    table.add_column("iteration", justify="right", width=8)
-    table.add_column("lift", style="dim", width=15)
-    table.add_column("weight (kg)", justify="right", width=9)
-    table.add_column("reps", justify="right", width=6)
-    table.add_column("bw (kg)", justify="right", width=10)
-    table.add_column("type", style="dim", width=7)
+    # Build column definitions dynamically from LiftEntry fields
+    col_defs = []
+    for field in fields(LiftEntry):
+        name = field.name.lower()
+        style = "dim" if name in ("date", "program", "lift", "type") else None
+        justify = "right" if name in ("weight", "reps", "bodyweight") else None
+        width = {
+            "date": 12,
+            "program": 15,
+            "program_iteration": 8,
+            "lift": 15,
+            "weight": 9,
+            "reps": 6,
+            "bodyweight": 10,
+            "top_set": 7,
+            "warm_up_set": 7,
+        }.get(name, None)
+        col_defs.append((name, style, justify, width))
+
+    for name, style, justify, width in col_defs:
+        label = {
+            "date": "date",
+            "program": "program",
+            "program_iteration": "iteration",
+            "lift": "lift",
+            "weight": "weight (lbs)",
+            "reps": "reps",
+            "bodyweight": "bw (lbs)",
+            "top_set": "type",
+            "warm_up_set": "type",
+            "reps_in_reserve": "rir",
+            "filepath": "file",
+        }[name]
+        table.add_column(label, style=style, justify=justify, width=width)
 
     for entry in entries:
         type_label = (

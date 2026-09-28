@@ -188,252 +188,133 @@ def test_build_query_works_combination(all_lift_cols):
     observed_query, observed_parameter = _build_query(filter_input)
     assert observed_query == expected_query
     assert observed_parameter == expected_parameter
-# def test_fetch_lifts_empty_db(tmpdir):
-#     """Test that fetch_lifts returns empty list when no data exists."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
-
-#     result = fetch_lifts(str(db_path))
-
-#     assert result == []
 
 
-# def test_fetch_lifts_all_data(tmpdir):
-#     """Test fetching all lifts without filters."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
+def test_build_query_works_empty():
+    """Test that _build_query returns the correct SQL query for an empty filter."""
+    # sample input
+    filter_input = {}
+    
+    # expected return vals
+    expected_query = "SELECT date, program, program_iteration, lift, weight, reps, bodyweight, top_set, warm_up_set, reps_in_reserve, filepath FROM lifts"
+    expected_parameter = []
 
-#     # Add sample data
-#     entries = [
-#         LiftEntry(
-#             date="2025-03-15",
-#             program="StrongLifts",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100,
-#             reps=5,
-#             bodyweight=85.5,
-#             top_set=True,
-#         ),
-#         LiftEntry(
-#             date="2025-03-16",
-#             program="StrongLifts",
-#             program_iteration=1,
-#             lift="deadlift",
-#             weight=140,
-#             reps=3,
-#             bodyweight=85.5,
-#             top_set=True,
-#         ),
-#     ]
-
-#     for entry in entries:
-#         add_lift_entry(str(db_path), entry)
-
-#     result = fetch_lifts(str(db_path))
-
-#     assert len(result) == 2
-#     assert all(isinstance(e, LiftEntry) for e in result)
+    # check success
+    observed_query, observed_parameter = _build_query(filter_input)
+    assert observed_query == expected_query
+    assert observed_parameter == expected_parameter
 
 
-# def test_fetch_lifts_by_weight(tmpdir):
-#     """Test filtering by weight."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
+def test_fetch_lifts_works_no_filters(tmpdir):
+    # initialize temp db
+    test_db_path = tmpdir / "test.db"
+    init_database(test_db_path)
 
-#     # Add sample data with different weights
-#     for i in range(5):
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date=f"2025-03-{i+1:02d}",
-#             program="Test",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100 + i * 10,  # 100, 110, 120, 130, 140
-#             reps=5,
-#         ))
+    # add some data to the db
+    sample_lift_entry = LiftEntry(
+        date="2025-01-01",
+        program="Test Program",
+        program_iteration=1,
+        lift="Bicep Curl",
+        weight=100,
+        reps=2,
+    )
+    add_lift_entry(
+        test_db_path,
+        sample_lift_entry
+    )
 
-#     result = fetch_lifts(str(db_path), filters={"weight": 120})
+    # call fn
+    sample_filters = {}
+    observed_rows = fetch_lifts(test_db_path, sample_filters)
 
-#     assert len(result) == 1
-#     assert result[0].weight == 120
+    # check success
+    assert observed_rows == [sample_lift_entry]
+    
 
+def test_fetch_lifts_works_with_filter(tmpdir):
+    # initialize temp db
+    test_db_path = tmpdir / "test.db"
+    init_database(test_db_path)
 
-# def test_fetch_lifts_by_program(tmpdir):
-#     """Test filtering by program name."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
+    # add some data to the db
+    sample_lift_entry = LiftEntry(
+        date="2025-01-01",
+        program="Test Program",
+        program_iteration=1,
+        lift="Bicep Curl",
+        weight=100,
+        reps=2,
+    )
+    add_lift_entry(
+        test_db_path,
+        sample_lift_entry
+    )
 
-#     for prog in ["StrongLifts", "P90X", "CrossFit"]:
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date="2025-03-15",
-#             program=prog,
-#             program_iteration=1,
-#             lift="pushup",
-#             weight=80,
-#             reps=10,
-#         ))
+    # call fn
+    sample_filters = {
+        "lift": "Bicep Curl",
+    }
+    observed_rows = fetch_lifts(test_db_path, sample_filters)
 
-#     result = fetch_lifts(str(db_path), filters={"program": "StrongLifts"})
-
-#     assert len(result) == 1
-#     assert result[0].program == "StrongLifts"
-
-
-# def test_fetch_lifts_by_date(tmpdir):
-#     """Test exact date filtering."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
-
-#     for day in ["2025-03-14", "2025-03-15", "2025-03-16"]:
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date=day,
-#             program="Test",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100,
-#             reps=5,
-#         ))
-
-#     result = fetch_lifts(str(db_path), filters={"date": "2025-03-15"})
-
-#     assert len(result) == 1
-#     assert result[0].date == "2025-03-15"
+    # check success
+    assert observed_rows == [sample_lift_entry]
 
 
-# def test_fetch_lifts_by_top_set(tmpdir):
-#     """Test filtering by top_set flag."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
+def test_fetch_lifts_works_with_filter_no_matches(tmpdir):
+    # initialize temp db
+    test_db_path = tmpdir / "test.db"
+    init_database(test_db_path)
 
-#     for is_top in [True, False]:
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date="2025-03-15",
-#             program="Test",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100,
-#             reps=5,
-#             top_set=is_top,
-#         ))
+    # add some data to the db
+    sample_lift_entry = LiftEntry(
+        date="2025-01-01",
+        program="Test Program",
+        program_iteration=1,
+        lift="Bicep Curl",
+        weight=100,
+        reps=2,
+    )
+    add_lift_entry(
+        test_db_path,
+        sample_lift_entry
+    )
 
-#     result = fetch_lifts(str(db_path), filters={"top_set": True})
+    # call fn
+    sample_filters = {
+        "lift": "Bench Press",
+    }
+    observed_rows = fetch_lifts(test_db_path, sample_filters)
 
-#     assert len(result) == 1
-#     assert result[0].top_set is True
-
-
-# def test_fetch_lifts_combined_filters(tmpdir):
-#     """Test combining multiple filter criteria."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
-
-#     # Add data that matches various combinations
-#     for i in range(6):
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date="2025-03-15",
-#             program="StrongLifts" if i % 2 == 0 else "P90X",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100 + (i * 10),  # 100, 110, 120, 130, 140, 150
-#             reps=5,
-#             top_set=i % 2 == 0,
-#         ))
-
-#     # Filter: StrongLifts + weight = 120 + top set
-#     result = fetch_lifts(str(db_path), filters={
-#         "program": "StrongLifts",
-#         "weight": 120,
-#         "top_set": True,
-#     })
-
-#     assert len(result) == 1
-#     assert result[0].program == "StrongLifts"
-#     assert result[0].weight == 120.0
-#     assert result[0].top_set is True
+    # check success
+    assert observed_rows == []
 
 
-# def test_fetch_lifts_limit(tmpdir):
-#     """Test that limit parameter restricts results."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
+def test_fetch_lifts_works_with_limit(tmpdir):
+    # initialize temp db
+    test_db_path = tmpdir / "test.db"
+    init_database(test_db_path)
 
-#     for i in range(10):
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date=f"2025-03-{i+1:02d}",
-#             program="Test",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100,
-#             reps=5,
-#         ))
+    # add some data to the db
+    for i in range(10):
+        sample_lift_entry = LiftEntry(
+            date=f"2025-01-{i}",
+            program="Test Program",
+            program_iteration=1,
+            lift="Bicep Curl",
+            weight=100,
+            reps=2,
+        )
+        add_lift_entry(
+            test_db_path,
+            sample_lift_entry
+        )
 
-#     result = fetch_lifts(str(db_path), limit=5)
+    # call fn
+    sample_filters = {
+        "lift": "Bicep Curl",
+    }
+    observed_rows = fetch_lifts(test_db_path, sample_filters, limit=2)
 
-#     assert len(result) == 5
-
-
-# def test_fetch_lifts_no_matches(tmpdir):
-#     """Test that empty list is returned when no matches found."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
-
-#     add_lift_entry(str(db_path), LiftEntry(
-#         date="2025-03-15",
-#         program="StrongLifts",
-#         program_iteration=1,
-#         lift="squat",
-#         weight=100,
-#         reps=5,
-#     ))
-
-#     result = fetch_lifts(str(db_path), filters={"weight": 999})
-
-#     assert result == []
-
-
-# def test_fetch_lifts_date_prefix_match(tmpdir):
-#     """Test date prefix matching via min_date/max_date (e.g., '2025-03' matches all of March)."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
-
-#     for day in ["2025-02-14", "2025-03-01", "2025-03-15", "2025-04-01"]:
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date=day,
-#             program="Test",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100,
-#             reps=5,
-#         ))
-
-#     # Use min_date for prefix matching (matches all dates starting with '2025-03')
-#     result = fetch_lifts(str(db_path), filters={"min_date": "2025-03"})
-
-#     assert len(result) == 2
-#     # Should match both March dates
-#     dates = [r.date for r in result]
-#     assert "2025-03-01" in dates
-#     assert "2025-03-15" in dates
-
-
-# def test_fetch_lifts_date_range(tmpdir):
-#     """Test date range filtering with min_date and max_date."""
-#     db_path = tmpdir / "test.db"
-#     init_database(db_path)
-
-#     for day in ["2025-03-14", "2025-03-15", "2025-03-16"]:
-#         add_lift_entry(str(db_path), LiftEntry(
-#             date=day,
-#             program="Test",
-#             program_iteration=1,
-#             lift="squat",
-#             weight=100,
-#             reps=5,
-#         ))
-
-#     result = fetch_lifts(str(db_path), filters={
-#         "min_date": "2025-03-14",
-#         "max_date": "2025-03-16",
-#     })
-
-#     assert len(result) == 3
+    # check success
+    assert len(observed_rows) == 2

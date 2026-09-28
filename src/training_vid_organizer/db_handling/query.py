@@ -7,10 +7,9 @@ from typing import Any
 from .db import LiftEntry
 
 
-# TODO: double-check tests for this one
 def fetch_lifts(
     db_path: str,
-    filters: dict[str, Any] | None = None,
+    filters: dict[str, Any],
     limit: int | None = 100,
 ) -> list[LiftEntry]:
     """Execute a parameterized query and return LiftEntry objects.
@@ -67,7 +66,6 @@ def fetch_lifts(
         conn.close()
 
 
-# TODO: figure out how to fix by writing tests for this
 def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
     """Construct parameterized SQL query with WHERE clauses.
 

@@ -255,7 +255,7 @@ def list_lifts(
         ("reps", None, "right", None),
         ("bodyweight", None, "right", None),
         ("type_label", "dim", None, None),
-        ("filepath", None, None, None),
+        ("filename", None, None, None),
     ]
 
     for name, style, justify, width in col_defs:
@@ -268,7 +268,7 @@ def list_lifts(
             "reps": "reps",
             "bodyweight": "bw (lbs)",
             "type_label": "type",
-            "filepath": "file",
+            "filename": "file",
         }[name]
         table.add_column(label, style=style, justify=justify, width=width)
 
@@ -464,7 +464,11 @@ def open_files(
         table.add_column(label, style=style, justify=justify)
 
     for entry in entries:
-        type_labels = ["top"] if entry.top_set else [] + (["warm-up"] if entry.warm_up_set else [])
+        type_labels = (
+            ["top"]
+            if entry.top_set
+            else [] + (["warm-up"] if entry.warm_up_set else [])
+        )
         type_label = ", ".join(type_labels) if type_labels else "-"
 
         table.add_row(

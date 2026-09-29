@@ -82,7 +82,7 @@ def init_database(db_path: Path) -> None:
         cursor = conn.cursor()
 
         # Build CREATE TABLE statement from dataclass fields
-        columns = []
+        columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]  # Add ID column first
         tv_logger.debug("converting dataclass schema to SQL-friendly schema ...")
         for field in fields(LiftEntry):
             name = field.name.lower()

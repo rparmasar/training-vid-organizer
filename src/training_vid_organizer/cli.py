@@ -21,6 +21,7 @@ from training_vid_organizer.db_handling.db import (
     init_database,
 )
 from training_vid_organizer.db_handling.query import fetch_lifts
+from training_vid_organizer.db_handling.update import delete_lift_entry, update_lift_entry
 from training_vid_organizer.logging_config import logger as tv_logger
 from training_vid_organizer.utils import get_config_paths
 
@@ -288,6 +289,100 @@ def list_lifts(
 
     console.print(table)
     tv_logger.info(f"listed {len(entries)} lift(s)")
+
+
+@app.command("update")
+def update(
+    entry_id: Annotated[int, Argument(help="Row ID to update")],
+    date: Annotated[str | None, Option("--date")] = None,
+    program: Annotated[str | None, Option("--program")] = None,
+    program_iteration: Annotated[int | None, Option("--iteration", "-i")] = None,
+    lift: Annotated[str | None, Option("--lift", "-l")] = None,
+    weight: Annotated[float | None, Option("--weight", "-w")] = None,
+    reps: Annotated[int | None, Option("--reps", "-r")] = None,
+    bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
+    top_set: Annotated[bool | None, Option("--top-set", "-t")] = None,
+    warm_up_set: Annotated[bool | None, Option("--warm-up-set", "-w")] = None,
+    reps_in_reserve: Annotated[float | None, Option("--reps_in_reserve", "-rir")] = None,
+    filepath: Annotated[str | None, Option("--filepath", "-f")] = None,
+    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
+):
+    """Update a lift entry by ID with the provided fields."""
+    # allow per-command override
+    effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
+
+    # Collect update kwargs (exclude None values to avoid unintended NULLs)
+    update_kwargs: dict[str, Any] = {}
+    if date is not None:
+        update_kwargs["date"] = str(date)
+    if program is not None:
+        update_kwargs["program"] = str(program)
+    if program_iteration is not None:
+        update_kwargs["program_iteration"] = int(program_iteration)
+    if lift is not None:
+        update_kwargs["lift"] = str(lift)
+    if weight is not None:
+        update_kwargs["weight"] = float(weight)
+    if reps is not None:
+        update_kwargs["reps"] = int(reps)
+    if bodyweight is not None:
+        update_kwargs["bodyweight"] = float(bodyweight)
+    if top_set is not None:
+        update_kwargs["top_set"] = bool(top_set)
+    if warm_up_set is not None:
+        update_kwargs["warm_up_set"] = bool(warm_up_set)
+    if reps_in_reserve is not None:
+        update_kwargs["reps_in_reserve"] = float(reps_in_reserve)
+    if filepath is not None:
+        update_kwargs["filepath"] = str(filepath)
+
+    tv_logger.debug(f"update_lift_entry called with entry_id={entry_id}, kwargs={update_kwargs}")
+
+    try:
+        rows_updated = update_lift_entry(
+            db_path=effective_db_path, entry_id=entry_id, **update_kwargs
+        )
+    except ValueError as e:
+        tv_logger.error(f"Database error: {e}")
+        raise typer.Exit(code=2)
+
+    if rows_updated:
+        fields_str = ", ".join(f"{k}={v}" for k, v in update_kwargs.items())
+        console.print(f"[green]✓[/green] updated lift #{entry_id}: {fields_str}")
+    else:
+        console.print(
+            f"[red]✗[/red] no row found with ID {entry_id} or no valid fields provided"
+        )
+
+
+@app.command("delete")
+def delete(
+    entry_id: Annotated[int, Argument(help="Row ID to delete")],
+    force: Annotated[bool, Option("--force")] = False,
+    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
+):
+    """Delete a lift entry by ID."""
+    # allow per-command override
+    effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
+
+    if not force and not confirm(f"Delete lift entry #{entry_id} from '{effective_db_path}'?"):
+        echo("[yellow]Aborted.[/yellow]")
+        raise typer.Exit(code=1)
+
+    tv_logger.debug(f"delete_lift_entry called with entry_id={entry_id}")
+
+    try:
+        deleted = delete_lift_entry(db_path=effective_db_path, entry_id=entry_id)
+    except ValueError as e:
+        tv_logger.error(f"Database error: {e}")
+        raise typer.Exit(code=2)
+
+    if deleted:
+        console.print(f"[green]✓[/green] deleted lift #{entry_id} from the database")
+    else:
+        console.print(
+            f"[red]✗[/red] no row found with ID {entry_id} or deletion failed"
+        )
 
 
 if __name__ == "__main__":

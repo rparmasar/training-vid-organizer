@@ -13,7 +13,7 @@ todo
 ### core features
 
 * [done] resetting db
-* update + deleting rows in db (maybe expose a query command for advanced usecases that just executes UPDATE statements?)
+* [done] update + deleting rows in db (maybe expose a query command for advanced usecases that just executes UPDATE statements?)
 * opening video files based on results of `list lifts` command
 * add help text for commands + options
 

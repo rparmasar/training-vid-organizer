@@ -3,6 +3,8 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
 
+from training_vid_organizer.logging_config import logger as tv_logger
+
 
 @dataclass
 class LiftEntry:
@@ -81,7 +83,7 @@ def init_database(db_path: Path) -> None:
 
         # Build CREATE TABLE statement from dataclass fields
         columns = []
-        print("converting dataclass schema to SQL-friendly schema ...")
+        tv_logger.debug("converting dataclass schema to SQL-friendly schema ...")
         for field in fields(LiftEntry):
             name = field.name.lower()
             dtype = _get_sql_type(field.type, field.default)
@@ -91,13 +93,13 @@ def init_database(db_path: Path) -> None:
                 col_def += f" DEFAULT {default}"
             columns.append(col_def)
 
-        print("preparing to execute creation query ...")
+        tv_logger.debug("preparing to execute creation query ...")
         create_table_sql = (
             "CREATE TABLE IF NOT EXISTS lifts (" + ", ".join(columns) + ") "
         )
         cursor.execute(create_table_sql)
         conn.commit()
-        print(f"successfully created lifts table in database at {db_path=}")
+        tv_logger.info(f"successfully created lifts table in database at {db_path=}")
     finally:
         conn.close()
 
@@ -128,6 +130,7 @@ def add_lift_entry(db_path: Path, entry: LiftEntry) -> int:
         cursor.execute(insert_sql, values)
         conn.commit()
 
+        tv_logger.debug(f"inserted lift entry: {entry}")
         return cursor.rowcount
     finally:
         conn.close()
@@ -153,6 +156,7 @@ def add_session_entry(db_path: Path, entries: list[LiftEntry]) -> int:
 
     # Empty list is valid - return 0 without DB access
     if not entries:
+        tv_logger.debug("add_session_entry called with empty list")
         return 0
 
     # Batch insert with executemany (single connection)
@@ -170,6 +174,7 @@ def add_session_entry(db_path: Path, entries: list[LiftEntry]) -> int:
         cursor.executemany(insert_sql, values_list)
         conn.commit()
 
+        tv_logger.info(f"inserted {len(entries)} lift entry(ies) into database")
         return cursor.rowcount
     except sqlite3.Error as e:
         raise ValueError(

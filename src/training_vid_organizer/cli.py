@@ -1,6 +1,7 @@
 """CLI entry point using Typer."""
 
 import json
+import logging
 import os
 import sqlite3
 from dataclasses import fields
@@ -20,11 +21,20 @@ from training_vid_organizer.db_handling.db import (
     init_database,
 )
 from training_vid_organizer.db_handling.query import fetch_lifts
+from training_vid_organizer.logging_config import logger as tv_logger
 from training_vid_organizer.utils import get_config_paths
+
+# Set log level from environment variable if set
+log_level = os.getenv("TVO_LOG_LEVEL", "INFO").upper()
+if log_level in ("DEBUG", "INFO"):
+    tv_logger.setLevel(getattr(logging, log_level))
+
 
 APP_NAME = "training-vid-organizer"
 CONFIG_DIR = Path(typer.get_app_dir(APP_NAME))
 DB_DEFAULT = CONFIG_DIR / "training.db"
+
+console = Console()
 
 
 app = Typer(
@@ -59,14 +69,14 @@ def init_db(
     # Create config directory if needed (for future use)
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
-    echo(f"creating training log database in {effective_db_path=}")
+    tv_logger.info(f"creating training log database in {effective_db_path=}")
     init_database(db_path=effective_db_path)
 
     # Persist the choice to env vars for future commands
     os.environ["TVO_DB_PATH"] = effective_db_path
     os.environ["TVO_VIDEO_DIR"] = ""  # empty string, user sets later
 
-    echo("database created successfully!")
+    tv_logger.info("database created successfully!")
 
 
 @add_group.command("lift")
@@ -106,16 +116,16 @@ def add_lift(
             filepath,
         )
     except (TypeError, ValueError) as e:
-        echo(f"Error creating lift entry: {e}")
+        tv_logger.error(f"Error creating lift entry: {e}")
         raise typer.Exit(code=1)
 
     # add via function
     rows_updated = add_lift_entry(db_path=effective_db_path, entry=current_lift_entry)
 
     if rows_updated:
-        echo(f"added {current_lift_entry} to the database!")
+        console.print(f"[green]✓[/green] added {current_lift_entry} to the database!")
     else:
-        echo(f"failed to add {current_lift_entry} to the database!")
+        console.print("[red]✗[/red] failed to add lift to the database!")
 
 
 @add_group.command("session")
@@ -128,28 +138,31 @@ def add_session(
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
     # load and parse JSON
+    tv_logger.debug(f"loading session data from {config_path}")
     with open(config_path) as f:
         session_data = json.load(f)
 
     if not isinstance(session_data, list):
-        echo("Error: JSON root must be a list of lift entries")
+        tv_logger.error("Error: JSON root must be a list of lift entries")
         raise typer.Exit(code=1)
 
     # convert dicts to LiftEntry objects
     try:
         entries = [LiftEntry(**entry_dict) for entry_dict in session_data]
     except (TypeError, ValueError) as e:
-        echo(f"Error parsing lift entries: {e}")
+        tv_logger.error(f"Error parsing lift entries: {e}")
         raise typer.Exit(code=1)
 
     # add via function
     rows_updated = add_session_entry(db_path=effective_db_path, entries=entries)
 
     if rows_updated == len(entries):
-        echo(f"added {rows_updated} entries from {config_path=} to the database!")
+        console.print(
+            f"[green]✓[/green] added {rows_updated} entries from {config_path}"
+        )
     else:
-        echo(
-            f"failed to add all {len(entries)} entries ({rows_updated}/{len(entries)})"
+        console.print(
+            f"[red]✗[/red] failed to add all {len(entries)} entries ({rows_updated}/{len(entries)})"
         )
 
 
@@ -195,19 +208,20 @@ def list_lifts(
     # Use provided db_path or fall back to default config path
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
+    tv_logger.debug(f"fetch_lifts called with filters={filters}, limit={limit}")
+
     try:
         entries = fetch_lifts(
             db_path=effective_db_path, filters=filters or {}, limit=limit
         )
     except sqlite3.Error as e:
-        echo(f"Database error: {e}")
+        tv_logger.error(f"Database error: {e}")
         raise typer.Exit(code=2)
 
     if not entries:
-        echo("No lifts found matching the specified criteria.")
+        console.print("[dim]No lifts found matching the specified criteria.[/dim]")
         return
 
-    console = Console()
     table = Table(
         box=None,
         show_header=True,
@@ -266,6 +280,7 @@ def list_lifts(
         )
 
     console.print(table)
+    tv_logger.info(f"listed {len(entries)} lift(s)")
 
 
 if __name__ == "__main__":

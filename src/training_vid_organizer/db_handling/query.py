@@ -5,6 +5,8 @@ from dataclasses import fields
 from pathlib import Path
 from typing import Any
 
+from training_vid_organizer.logging_config import logger as tv_logger
+
 from .db import LiftEntry
 
 
@@ -41,6 +43,8 @@ def fetch_lifts(
 
         if not rows:
             return []
+
+        tv_logger.debug(f"fetched {len(rows)} lift(s) with filters={filters}")
 
         # Map raw tuples to LiftEntry instances
         entries = []
@@ -143,4 +147,5 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
     else:
         sql = base
 
+    tv_logger.debug(f"_build_query generated: {sql}, params={params}")
     return sql, params

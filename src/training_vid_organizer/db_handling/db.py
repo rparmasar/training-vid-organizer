@@ -20,7 +20,7 @@ class LiftEntry:
     top_set: bool = False
     warm_up_set: bool = False
     reps_in_reserve: int | None = None
-    filepath: Path | None = None
+    filename: Path | None = None
 
 
 def _get_sql_type(annotation: Any, default: Any) -> str:

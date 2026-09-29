@@ -63,6 +63,10 @@ def fetch_lifts(
                 except (ValueError, TypeError):
                     pass  # Keep as string if conversion fails
 
+            # Handle filename field - ensure it's a Path or None
+            if "filename" in entry_dict and isinstance(entry_dict["filename"], str):
+                entry_dict["filename"] = Path(entry_dict["filename"])
+
             entries.append(LiftEntry(**entry_dict))
 
         return entries

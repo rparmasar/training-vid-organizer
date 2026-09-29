@@ -1,7 +1,7 @@
 import os
+import typer
 from pathlib import Path
-
-from src.training_vid_organizer.utils import get_config_paths
+from src.training_vid_organizer.utils import get_config_paths, open_video_file
 
 
 def test_get_config_paths_defaults():
@@ -67,3 +67,32 @@ def test_get_config_paths_custom_default():
 
     assert db_path == "/app/data/training.db"
     assert video_dir == ""
+
+
+def test_open_video_file_works(tmpdir, monkeypatch):
+    # setup inputs
+    input_filename = "test.txt"
+    input_base_dir = Path(tmpdir)
+
+    # write file to tmp dir
+    (input_base_dir / input_filename).write_text("Hello, world!")
+
+    # mock typer launch
+    called_urls = []
+    mock_launch = monkeypatch.setattr(typer, "launch", lambda url: called_urls.append(url))
+
+    # call fn
+    observed_result = open_video_file(input_filename, input_base_dir)
+
+    assert observed_result == True
+
+
+def test_open_video_file_handles_not_found(tmpdir, monkeypatch):
+    # setup inputs
+    input_filename = "test.txt"
+    input_base_dir = Path(tmpdir)
+
+    # call fn
+    observed_result = open_video_file(input_filename, input_base_dir)
+
+    assert observed_result == False

@@ -11,7 +11,7 @@ from typing import Annotated, Any
 import typer
 from rich.console import Console
 from rich.table import Table
-from typer import Argument, Option, Typer, echo, confirm
+from typer import Argument, Option, Typer, confirm, echo
 
 from training_vid_organizer.__init__ import __version__
 from training_vid_organizer.db_handling.db import (
@@ -21,9 +21,16 @@ from training_vid_organizer.db_handling.db import (
     init_database,
 )
 from training_vid_organizer.db_handling.query import fetch_lifts
-from training_vid_organizer.db_handling.update import delete_lift_entry, update_lift_entry
+from training_vid_organizer.db_handling.update import (
+    delete_lift_entry,
+    update_lift_entry,
+)
 from training_vid_organizer.logging_config import logger as tv_logger
-from training_vid_organizer.utils import get_config_paths
+from training_vid_organizer.utils import (
+    get_config_paths,
+    get_video_base_dir,
+    open_video_file,
+)
 
 # Set log level from environment variable if set
 log_level = os.getenv("TVO_LOG_LEVEL", "INFO").upper()
@@ -303,7 +310,9 @@ def update(
     bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
     top_set: Annotated[bool | None, Option("--top-set", "-t")] = None,
     warm_up_set: Annotated[bool | None, Option("--warm-up-set", "-w")] = None,
-    reps_in_reserve: Annotated[float | None, Option("--reps_in_reserve", "-rir")] = None,
+    reps_in_reserve: Annotated[
+        float | None, Option("--reps_in_reserve", "-rir")
+    ] = None,
     filepath: Annotated[str | None, Option("--filepath", "-f")] = None,
     db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
 ):
@@ -336,7 +345,9 @@ def update(
     if filepath is not None:
         update_kwargs["filepath"] = str(filepath)
 
-    tv_logger.debug(f"update_lift_entry called with entry_id={entry_id}, kwargs={update_kwargs}")
+    tv_logger.debug(
+        f"update_lift_entry called with entry_id={entry_id}, kwargs={update_kwargs}"
+    )
 
     try:
         rows_updated = update_lift_entry(
@@ -365,7 +376,9 @@ def delete(
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
-    if not force and not confirm(f"Delete lift entry #{entry_id} from '{effective_db_path}'?"):
+    if not force and not confirm(
+        f"Delete lift entry #{entry_id} from '{effective_db_path}'?"
+    ):
         echo("[yellow]Aborted.[/yellow]")
         raise typer.Exit(code=1)
 
@@ -383,6 +396,96 @@ def delete(
         console.print(
             f"[red]✗[/red] no row found with ID {entry_id} or deletion failed"
         )
+
+
+@app.command("open")
+def open_files(
+    date: Annotated[str | None, Option("--date")] = None,
+    program: Annotated[str | None, Option("--program")] = None,
+    iteration: Annotated[int | None, Option("--iteration", "-i")] = None,
+    lift: Annotated[str | None, Option("--lift", "-L")] = None,
+    weight: Annotated[float | None, Option("--weight", "-w")] = None,
+    top_set: Annotated[bool | None, Option("--top-set", "-t")] = None,
+    warm_up_set: Annotated[bool | None, Option("--warm-up-set", "-w")] = None,
+    limit: Annotated[int, Option("--limit", "-l")] = 50,
+    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
+):
+    """Open video files for filtered lifts."""
+
+    # Build filters (same pattern as list_lifts)
+    filters: dict[str, Any] = {}
+    if date is not None:
+        filters["date"] = str(date)
+    if program is not None:
+        filters["program"] = str(program)
+    if iteration is not None:
+        filters["program_iteration"] = int(iteration)
+    if lift is not None:
+        filters["lift"] = str(lift)
+    if weight is not None:
+        filters["weight"] = float(weight)
+    if top_set is not None:
+        filters["top_set"] = bool(top_set)
+    if warm_up_set is not None:
+        filters["warm_up_set"] = bool(warm_up_set)
+
+    # Fetch data
+    effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
+    entries = fetch_lifts(db_path=effective_db_path, filters=filters, limit=limit)
+
+    if not entries:
+        console.print("[dim]No lifts found matching the specified criteria.[/dim]")
+        return
+
+    # Show results table (same style as list_lifts)
+    table = Table(box=None, show_header=True, header_style="dim", expand=False)
+    col_defs = [
+        ("date", "dim"),
+        ("program", "dim"),
+        ("program_iteration", "dim"),
+        ("lift", "dim"),
+        ("weight", None, "right"),
+        ("reps", None, "right"),
+        ("type_label", "dim"),
+        ("filename", None),
+    ]
+
+    for name, style, justify in col_defs:
+        label = {
+            "date": "date",
+            "program": "program",
+            "program_iteration": "iteration",
+            "lift": "lift",
+            "weight": "weight (lbs)",
+            "reps": "reps",
+            "type_label": "type",
+            "filename": "file",
+        }[name]
+        table.add_column(label, style=style, justify=justify)
+
+    for entry in entries:
+        type_labels = ["top"] if entry.top_set else [] + (["warm-up"] if entry.warm_up_set else [])
+        type_label = ", ".join(type_labels) if type_labels else "-"
+
+        table.add_row(
+            str(entry.date),
+            str(entry.program),
+            f"{int(entry.program_iteration)}",
+            str(entry.lift),
+            f"{entry.weight:.1f}",
+            f"{int(entry.reps)}",
+            type_label,
+            str(entry.filename) if entry.filename else "-",
+        )
+
+    console.print(table)
+
+    # Open files (deduplicate with set)
+    base_dir = get_video_base_dir()
+    unique_files = sorted(set(str(e.filename) for e in entries if e.filename))
+
+    for filepath in unique_files:
+        open_video_file(filepath, base_dir)
 
 
 if __name__ == "__main__":

@@ -280,7 +280,7 @@ def list_lifts(
             type_labels.append("warm-up")
         type_label = ", ".join(type_labels) if type_labels else "-"
 
-        filepath_str = str(entry.filepath) if entry.filepath else "-"
+        filepath_str = str(entry.filename) if entry.filename else "-"
 
         table.add_row(
             str(entry.date),
@@ -343,7 +343,7 @@ def update(
     if reps_in_reserve is not None:
         update_kwargs["reps_in_reserve"] = float(reps_in_reserve)
     if filepath is not None:
-        update_kwargs["filepath"] = str(filepath)
+        update_kwargs["filename"] = str(filepath)
 
     tv_logger.debug(
         f"update_lift_entry called with entry_id={entry_id}, kwargs={update_kwargs}"

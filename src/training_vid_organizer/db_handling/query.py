@@ -85,7 +85,6 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
       - program_iteration: integer match
       - weight: numeric match
       - bodyweight: numeric match
-      - min_date / max_date: prefix matching for ranges ('2025-03' → March 2025)
       - top_set, warm_up_set: boolean flags (1/0 in SQLite)
       - reps_in_reserve: numeric match
 

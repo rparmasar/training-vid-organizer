@@ -196,7 +196,7 @@ def test_build_query_works_empty():
     filter_input = {}
     
     # expected return vals
-    expected_query = "SELECT date, program, program_iteration, lift, weight, reps, bodyweight, top_set, warm_up_set, reps_in_reserve, filepath FROM lifts ORDER BY date DESC"
+    expected_query = "SELECT date, program, program_iteration, lift, weight, reps, bodyweight, top_set, warm_up_set, reps_in_reserve, filename FROM lifts ORDER BY date DESC"
     expected_parameter = []
 
     # check success

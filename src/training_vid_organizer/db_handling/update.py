@@ -29,6 +29,13 @@ def update_lift_entry(db_path: Path, entry_id: int, **kwargs) -> bool:
         )
         kwargs = {k: v for k, v in kwargs.items() if k in valid_fields}
 
+    # Convert string filepath to Path for validation, then back to string for SQL binding
+    if "filename" in kwargs:
+        original_value = kwargs["filename"]
+        if isinstance(original_value, str):
+            kwargs["filename"] = Path(original_value)  # For type validation
+            kwargs["filename"] = str(kwargs["filename"])  # Convert back to string for SQL
+
     if not kwargs:
         tv_logger.debug("update_lift_entry: no fields to update")
         return False

@@ -11,7 +11,7 @@ from typing import Annotated, Any
 import typer
 from rich.console import Console
 from rich.table import Table
-from typer import Argument, Option, Typer, echo
+from typer import Argument, Option, Typer, echo, confirm
 
 from training_vid_organizer.__init__ import __version__
 from training_vid_organizer.db_handling.db import (
@@ -61,10 +61,18 @@ def callback(
 @app.command("init")
 def init_db(
     db_path: Annotated[str, Option("--db-path", "-d")] = None,
+    reset: Annotated[bool, Option("--reset")] = False,
 ):
     """initializes the database to store lift information"""
     # Use CONFIG_DIR/training.db if not overridden
     effective_db_path = db_path or str(DB_DEFAULT)
+
+    # Reset mode: delete existing DB if present and confirmed
+    if reset and Path(effective_db_path).exists():
+        if not confirm(f"Delete '{effective_db_path}' and recreate?"):
+            echo("[yellow]Aborted.[/yellow]")
+            raise typer.Exit(code=1)
+        Path(effective_db_path).unlink()
 
     # Create config directory if needed (for future use)
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -229,24 +237,18 @@ def list_lifts(
         expand=False,
     )
 
-    # Build column definitions dynamically from LiftEntry fields
-    col_defs = []
-    for field in fields(LiftEntry):
-        name = field.name.lower()
-        style = "dim" if name in ("date", "program", "lift", "type") else None
-        justify = "right" if name in ("weight", "reps", "bodyweight") else None
-        width = {
-            "date": 12,
-            "program": 15,
-            "program_iteration": 8,
-            "lift": 15,
-            "weight": 9,
-            "reps": 6,
-            "bodyweight": 10,
-            "top_set": 7,
-            "warm_up_set": 7,
-        }.get(name, None)
-        col_defs.append((name, style, justify, width))
+    # Define table columns explicitly (matching row data order)
+    col_defs = [
+        ("date", "dim", None, None),
+        ("program", "dim", None, None),
+        ("program_iteration", "dim", None, None),
+        ("lift", "dim", None, None),
+        ("weight", None, "right", None),
+        ("reps", None, "right", None),
+        ("bodyweight", None, "right", None),
+        ("type_label", "dim", None, None),
+        ("filepath", None, None, None),
+    ]
 
     for name, style, justify, width in col_defs:
         label = {
@@ -257,17 +259,21 @@ def list_lifts(
             "weight": "weight (lbs)",
             "reps": "reps",
             "bodyweight": "bw (lbs)",
-            "top_set": "type",
-            "warm_up_set": "type",
-            "reps_in_reserve": "rir",
+            "type_label": "type",
             "filepath": "file",
         }[name]
         table.add_column(label, style=style, justify=justify, width=width)
 
     for entry in entries:
-        type_label = (
-            "top" if entry.top_set else ("warm-up" if entry.warm_up_set else "-")
-        )
+        type_labels = []
+        if entry.top_set:
+            type_labels.append("top")
+        if entry.warm_up_set:
+            type_labels.append("warm-up")
+        type_label = ", ".join(type_labels) if type_labels else "-"
+
+        filepath_str = str(entry.filepath) if entry.filepath else "-"
+
         table.add_row(
             str(entry.date),
             str(entry.program),
@@ -277,6 +283,7 @@ def list_lifts(
             f"{int(entry.reps)}",
             f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
             type_label,
+            filepath_str,
         )
 
     console.print(table)

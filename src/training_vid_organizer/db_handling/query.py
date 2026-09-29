@@ -147,5 +147,8 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
     else:
         sql = base
 
+    # always order by date desc
+    final_sql = f"{sql} ORDER BY date DESC"
+
     tv_logger.debug(f"_build_query generated: {sql}, params={params}")
-    return sql, params
+    return final_sql, params

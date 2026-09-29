@@ -9,7 +9,7 @@ def test_build_query_works_exact_date(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date = ? ORDER BY date DESC"
     expected_parameter = ["2025-03-15"]
 
     # check success
@@ -26,7 +26,7 @@ def test_build_query_works_partial_date(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date LIKE ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date LIKE ? ORDER BY date DESC"
     expected_parameter = ["2025-03%"]
 
     # check success
@@ -43,7 +43,7 @@ def test_build_query_works_lift(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE lift = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE lift = ? ORDER BY date DESC"
     expected_parameter = ["front_squat"]
 
     # check success
@@ -60,7 +60,7 @@ def test_build_query_works_program(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE program = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE program = ? ORDER BY date DESC"
     expected_parameter = ["531-5+"]
 
     # check success
@@ -77,7 +77,7 @@ def test_build_query_works_program_iteration(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE program_iteration = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE program_iteration = ? ORDER BY date DESC"
     expected_parameter = [1]
 
     # check success
@@ -94,7 +94,7 @@ def test_build_query_works_weight(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE weight = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE weight = ? ORDER BY date DESC"
     expected_parameter = [275.0]
 
     # check success
@@ -111,7 +111,7 @@ def test_build_query_works_bodyweight(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE bodyweight = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE bodyweight = ? ORDER BY date DESC"
     expected_parameter = [275.0]
 
     # check success
@@ -128,7 +128,7 @@ def test_build_query_works_top_set(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE top_set = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE top_set = ? ORDER BY date DESC"
     expected_parameter = [1]
 
     # check success
@@ -145,7 +145,7 @@ def test_build_query_works_warm_up_set(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE warm_up_set = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE warm_up_set = ? ORDER BY date DESC"
     expected_parameter = [1]
 
     # check success
@@ -162,7 +162,7 @@ def test_build_query_works_reps_in_reserve(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE reps_in_reserve = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE reps_in_reserve = ? ORDER BY date DESC"
     expected_parameter = [2]
 
     # check success
@@ -181,7 +181,7 @@ def test_build_query_works_combination(all_lift_cols):
     }
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date LIKE ? AND lift = ? AND reps_in_reserve = ?"
+    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date LIKE ? AND lift = ? AND reps_in_reserve = ? ORDER BY date DESC"
     expected_parameter = ["2025-02%", "front_squat", 2]
 
     # check success
@@ -196,7 +196,7 @@ def test_build_query_works_empty():
     filter_input = {}
     
     # expected return vals
-    expected_query = "SELECT date, program, program_iteration, lift, weight, reps, bodyweight, top_set, warm_up_set, reps_in_reserve, filepath FROM lifts"
+    expected_query = "SELECT date, program, program_iteration, lift, weight, reps, bodyweight, top_set, warm_up_set, reps_in_reserve, filepath FROM lifts ORDER BY date DESC"
     expected_parameter = []
 
     # check success

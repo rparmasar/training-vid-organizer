@@ -3,6 +3,6 @@ repos:
     rev: v0.16.8
     hooks:
       - id: ruff
-        name: Lint with Ruff (src only)
+        name: Lint with Ruff
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^src/
+        files: ^(src|tests)/

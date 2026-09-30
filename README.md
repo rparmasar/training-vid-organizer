@@ -7,7 +7,7 @@ A CLI tool for organizing training videos and logging lift data with SQLite stor
 - Add individual lifts or bulk import sessions from JSON
 - List, update, and delete logged entries
 - Filter by date, program, exercise, weight, RIR, etc.
-- Open video files directly from the database
+- Open video files to compare lift performance across various factors
 - Rich terminal output with tables and colors
 
 ## Prerequisites

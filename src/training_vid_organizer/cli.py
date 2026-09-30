@@ -59,17 +59,23 @@ app.add_typer(list_group)
 
 @app.callback(invoke_without_command=True)
 def callback(
-    version: Annotated[bool, Option("--version", "-v")] = False,
+    version: Annotated[
+        bool, Option("--version", "-v", help="show version number")
+    ] = False,
 ):
-    """Main callback for the CLI."""
+    """main callback for the cli"""
     if version:
         echo(f"training-vid-organizer v{__version__}")
 
 
 @app.command("init")
 def init_db(
-    db_path: Annotated[str, Option("--db-path", "-d")] = None,
-    reset: Annotated[bool, Option("--reset")] = False,
+    db_path: Annotated[
+        str, Option("--db-path", "-d", help="path to sqlite database file")
+    ] = None,
+    reset: Annotated[
+        bool, Option("--reset", help="delete existing db and recreate")
+    ] = False,
 ):
     """initializes the database to store lift information"""
     # Use CONFIG_DIR/training.db if not overridden
@@ -97,22 +103,38 @@ def init_db(
 
 @add_group.command("lift")
 def add_lift(
-    date: Annotated[str, Option("--date")],
-    program: Annotated[str, Option("--program")],
-    program_iteration: Annotated[int, Option("--iteration", "-i")],
-    lift: Annotated[str, Option("--lift", "-l")],
-    weight: Annotated[int, Option("--weight", "-w")],
-    reps: Annotated[int, Option("--reps", "-r")],
-    bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
-    top_set: Annotated[bool, Option("--top-set", "-t")] = False,
-    warm_up_set: Annotated[bool, Option("--warm-up-set", "-w")] = False,
-    reps_in_reserve: Annotated[
-        float | None, Option("--reps_in_reserve", "-rir")
+    date: Annotated[str, Option("--date", help="training date (YYYY-MM-DD)")],
+    program: Annotated[
+        str, Option("--program", help="name of the training program")
     ] = None,
-    filepath: Annotated[str | None, Option("--filepath", "-f")] = None,
-    db_path: Annotated[str, Option("--db-path", "-d")] = None,
+    program_iteration: Annotated[
+        int, Option("--iteration", "-i", help="current iteration number")
+    ] = 1,
+    lift: Annotated[
+        str, Option("--lift", "-l", help="exercise name (e.g. squat)")
+    ] = None,
+    weight: Annotated[int, Option("--weight", "-w", help="weight lifted in lbs")] = 0,
+    reps: Annotated[int, Option("--reps", "-r", help="number of repetitions")] = 10,
+    bodyweight: Annotated[
+        float | None, Option("--bodyweight", "-b", help="total body weight in lbs")
+    ] = None,
+    top_set: Annotated[
+        bool, Option("--top-set", "-t", help="mark as a top set")
+    ] = False,
+    warm_up_set: Annotated[
+        bool, Option("--warm-up-set", "-w", help="mark as a warmup set")
+    ] = False,
+    reps_in_reserve: Annotated[
+        float | None, Option("--reps_in_reserve", "-rir", help="RIR value (e.g. 1.5)")
+    ] = None,
+    filepath: Annotated[
+        str | None, Option("--filepath", "-f", help="path to video file")
+    ] = None,
+    db_path: Annotated[
+        str, Option("--db-path", "-d", help="override database path")
+    ] = None,
 ):
-    """Add a single lift entry."""
+    """add a single lift entry"""
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
@@ -146,10 +168,12 @@ def add_lift(
 
 @add_group.command("session")
 def add_session(
-    config_path: Annotated[str, Argument(help="Path to JSON configuration file")] = "",
-    db_path: Annotated[str, Option("--db-path", "-d")] = None,
+    config_path: Annotated[str, Argument(help="path to json configuration file")] = "",
+    db_path: Annotated[
+        str, Option("--db-path", "-d", help="override database path")
+    ] = None,
 ):
-    """Add multiple lifts from a JSON configuration file."""
+    """add multiple lifts from a json configuration file"""
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
@@ -184,21 +208,41 @@ def add_session(
 
 @list_group.command("lifts")
 def list_lifts(
-    date: Annotated[str | None, Option("--date")] = None,
-    program: Annotated[str | None, Option("--program")] = None,
-    iteration: Annotated[int | None, Option("--iteration", "-i")] = None,
-    lift: Annotated[str | None, Option("--lift", "-L")] = None,
-    weight: Annotated[float | None, Option("--weight", "-w")] = None,
-    bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
-    top_set: Annotated[bool | None, Option("--top-set", "-t")] = None,
-    warm_up_set: Annotated[bool | None, Option("--warm-up-set", "-w")] = None,
-    reps_in_reserve: Annotated[
-        float | None, Option("--reps_in_reserve", "-rir")
+    date: Annotated[
+        str | None, Option("--date", help="filter by training date")
     ] = None,
-    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
-    limit: Annotated[int | None, Option("--limit", "-l")] = 100,
+    program: Annotated[
+        str | None, Option("--program", help="filter by program name")
+    ] = None,
+    iteration: Annotated[
+        int | None, Option("--iteration", "-i", help="filter by iteration number")
+    ] = None,
+    lift: Annotated[
+        str | None, Option("--lift", "-L", help="filter by exercise name")
+    ] = None,
+    weight: Annotated[
+        float | None, Option("--weight", "-w", help="filter by weight in lbs")
+    ] = None,
+    bodyweight: Annotated[
+        float | None, Option("--bodyweight", "-b", help="filter by bodyweight in lbs")
+    ] = None,
+    top_set: Annotated[
+        bool | None, Option("--top-set", "-t", help="filter for top sets only")
+    ] = None,
+    warm_up_set: Annotated[
+        bool | None, Option("--warm-up-set", "-w", help="filter for warmup sets only")
+    ] = None,
+    reps_in_reserve: Annotated[
+        float | None, Option("--reps_in_reserve", "-rir", help="filter by RIR value")
+    ] = None,
+    db_path: Annotated[
+        str | None, Option("--db-path", "-d", help="override database path")
+    ] = None,
+    limit: Annotated[
+        int | None, Option("--limit", "-l", help="maximum number of results to show")
+    ] = 100,
 ):
-    """List lifts from the database with optional filters."""
+    """list lifts from the database with optional filters"""
     # Build filters dict from CLI arguments
     filters: dict[str, Any] = {}
 
@@ -294,29 +338,76 @@ def list_lifts(
             filepath_str,
         )
 
+    # Add ID column header after the table is built
+    table.add_column("id", style="dim", justify="right")
+
+    # Rebuild rows with ID column included
+    table.rows.clear()
+
+    for entry in entries:
+        type_labels = []
+        if entry.top_set:
+            type_labels.append("top")
+        if entry.warm_up_set:
+            type_labels.append("warm-up")
+        type_label = ", ".join(type_labels) if type_labels else "-"
+
+        filepath_str = str(entry.filename) if entry.filename else "-"
+
+        table.add_row(
+            str(entry.date),
+            str(entry.program),
+            f"{int(entry.program_iteration)}",
+            str(entry.lift),
+            f"{entry.weight:.1f}",
+            f"{int(entry.reps)}",
+            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
+            type_label,
+            filepath_str,
+            str(entry.entry_id) if entry.entry_id else "-",
+        )
+
     console.print(table)
     tv_logger.info(f"listed {len(entries)} lift(s)")
 
 
 @app.command("update")
 def update(
-    entry_id: Annotated[int, Argument(help="Row ID to update")],
-    date: Annotated[str | None, Option("--date")] = None,
-    program: Annotated[str | None, Option("--program")] = None,
-    program_iteration: Annotated[int | None, Option("--iteration", "-i")] = None,
-    lift: Annotated[str | None, Option("--lift", "-l")] = None,
-    weight: Annotated[float | None, Option("--weight", "-w")] = None,
-    reps: Annotated[int | None, Option("--reps", "-r")] = None,
-    bodyweight: Annotated[float | None, Option("--bodyweight", "-b")] = None,
-    top_set: Annotated[bool | None, Option("--top-set", "-t")] = None,
-    warm_up_set: Annotated[bool | None, Option("--warm-up-set", "-w")] = None,
-    reps_in_reserve: Annotated[
-        float | None, Option("--reps_in_reserve", "-rir")
+    entry_id: Annotated[int, Argument(help="row id to update")] = 0,
+    date: Annotated[str | None, Option("--date", help="new training date")] = None,
+    program: Annotated[str | None, Option("--program", help="new program name")] = None,
+    program_iteration: Annotated[
+        int | None, Option("--iteration", "-i", help="new iteration number")
     ] = None,
-    filepath: Annotated[str | None, Option("--filepath", "-f")] = None,
-    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
+    lift: Annotated[
+        str | None, Option("--lift", "-l", help="new exercise name")
+    ] = None,
+    weight: Annotated[
+        float | None, Option("--weight", "-w", help="new weight in lbs")
+    ] = None,
+    reps: Annotated[
+        int | None, Option("--reps", "-r", help="new repetition count")
+    ] = None,
+    bodyweight: Annotated[
+        float | None, Option("--bodyweight", "-b", help="new bodyweight in lbs")
+    ] = None,
+    top_set: Annotated[
+        bool | None, Option("--top-set", "-t", help="mark as top set")
+    ] = None,
+    warm_up_set: Annotated[
+        bool | None, Option("--warm-up-set", "-w", help="mark as warmup set")
+    ] = None,
+    reps_in_reserve: Annotated[
+        float | None, Option("--reps_in_reserve", "-rir", help="new RIR value")
+    ] = None,
+    filepath: Annotated[
+        str | None, Option("--filepath", "-f", help="new video file path")
+    ] = None,
+    db_path: Annotated[
+        str | None, Option("--db-path", "-d", help="override database path")
+    ] = None,
 ):
-    """Update a lift entry by ID with the provided fields."""
+    """update a lift entry by id with the provided fields"""
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
@@ -368,11 +459,13 @@ def update(
 
 @app.command("delete")
 def delete(
-    entry_id: Annotated[int, Argument(help="Row ID to delete")],
-    force: Annotated[bool, Option("--force")] = False,
-    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
+    entry_id: Annotated[int, Argument(help="row id to delete")] = 0,
+    force: Annotated[bool, Option("--force", help="skip confirmation prompt")] = False,
+    db_path: Annotated[
+        str | None, Option("--db-path", "-d", help="override database path")
+    ] = None,
 ):
-    """Delete a lift entry by ID."""
+    """delete a lift entry by id"""
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
@@ -400,17 +493,35 @@ def delete(
 
 @app.command("open")
 def open_files(
-    date: Annotated[str | None, Option("--date")] = None,
-    program: Annotated[str | None, Option("--program")] = None,
-    iteration: Annotated[int | None, Option("--iteration", "-i")] = None,
-    lift: Annotated[str | None, Option("--lift", "-L")] = None,
-    weight: Annotated[float | None, Option("--weight", "-w")] = None,
-    top_set: Annotated[bool | None, Option("--top-set", "-t")] = None,
-    warm_up_set: Annotated[bool | None, Option("--warm-up-set", "-w")] = None,
-    limit: Annotated[int, Option("--limit", "-l")] = 50,
-    db_path: Annotated[str | None, Option("--db-path", "-d")] = None,
+    date: Annotated[
+        str | None, Option("--date", help="filter by training date")
+    ] = None,
+    program: Annotated[
+        str | None, Option("--program", help="filter by program name")
+    ] = None,
+    iteration: Annotated[
+        int | None, Option("--iteration", "-i", help="filter by iteration number")
+    ] = None,
+    lift: Annotated[
+        str | None, Option("--lift", "-L", help="filter by exercise name")
+    ] = None,
+    weight: Annotated[
+        float | None, Option("--weight", "-w", help="filter by weight in lbs")
+    ] = None,
+    top_set: Annotated[
+        bool | None, Option("--top-set", "-t", help="filter for top sets only")
+    ] = None,
+    warm_up_set: Annotated[
+        bool | None, Option("--warm-up-set", "-w", help="filter for warmup sets only")
+    ] = None,
+    limit: Annotated[
+        int, Option("--limit", "-l", help="maximum number of results to show")
+    ] = 50,
+    db_path: Annotated[
+        str | None, Option("--db-path", "-d", help="override database path")
+    ] = None,
 ):
-    """Open video files for filtered lifts."""
+    """open video files for filtered lifts"""
 
     # Build filters (same pattern as list_lifts)
     filters: dict[str, Any] = {}

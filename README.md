@@ -60,3 +60,24 @@ tvo delete 42 --force
 - `TVO_DB_PATH` — override default database location
 - `TVO_VIDEO_DIR` — base directory for video files
 - `TVO_LOG_LEVEL` — set to DEBUG or INFO for verbose output
+
+## CI/CD Workflows
+
+Automated pipelines run on GitHub:
+
+- **CI (`ci.yml`)**: Runs on every commit/PR against main. Executes lint checks and fast tests for developer feedback.
+- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Builds wheels, auto-increments version based on conventional commits (BREAKING → major, feat! → minor, else patch), creates annotated tags, and generates release notes grouped by commit type.
+- **Publish (`publish.yml`)**: Manual trigger via workflow_dispatch. Uploads distributions to TestPyPI first, then production PyPI using GitHub Actions secrets for secure authentication.
+
+### Conventional Commits
+
+Commit messages are parsed for version bump decisions:
+
+```bash
+feat!: add export command          # MINOR bump (new feature)
+fix: correct query filter NULL     # PATCH bump (bug fix)
+refactor: simplify db init         # No bump (code restructure)
+BREAKING CHANGE: schema change     # MAJOR bump (breaking change)
+```
+
+Supported types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`.

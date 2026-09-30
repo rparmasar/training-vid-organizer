@@ -44,3 +44,8 @@ pre-commit autoupdate
 **Config files:**
 - `.pre-commit-config.yaml`: Single source of truth for all hooks
 - `.commitlintrc.json`: Shared config for commitlint validation
+
+## Publishing to PyPI
+Releases are published via GitHub Actions using `uv publish` directly. This approach handles Hatch's Metadata-Version 2.5+ wheels natively, avoiding compatibility issues with Docker-based publishing tools.
+
+**Required secret:** Add `PYPI_API_TOKEN` repository secret (from https://pypi.org/account/#api).

@@ -66,8 +66,7 @@ tvo delete 42 --force
 Automated pipelines run on GitHub:
 
 - **CI (`ci.yml`)**: Runs on every commit/PR against main. Executes lint checks and fast tests for developer feedback.
-- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Uses Hatch to auto-detect semantic version bumps from conventional commits, builds distributions, creates annotated tags, and generates release notes.
-- **Publish (`publish.yml`)**: Manual trigger via workflow_dispatch. Publishes to TestPyPI or PyPI using GitHub Actions trusted publishing (id-token).
+- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Uses Hatch to auto-detect semantic version bumps from conventional commits, builds distributions, creates annotated tags, and generates release notes. Publishes directly via `uv publish --token ${{ secrets.PYPI_API_TOKEN }}`.
 
 ### Local Development Hooks
 

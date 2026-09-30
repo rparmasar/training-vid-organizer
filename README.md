@@ -66,18 +66,46 @@ tvo delete 42 --force
 Automated pipelines run on GitHub:
 
 - **CI (`ci.yml`)**: Runs on every commit/PR against main. Executes lint checks and fast tests for developer feedback.
-- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Builds wheels, auto-increments version based on conventional commits (BREAKING → major, feat! → minor, else patch), creates annotated tags, and generates release notes grouped by commit type.
-- **Publish (`publish.yml`)**: Manual trigger via workflow_dispatch. Uploads distributions to TestPyPI first, then production PyPI using GitHub Actions secrets for secure authentication.
+- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Uses Hatch to auto-detect semantic version bumps from conventional commits, builds distributions, creates annotated tags, and generates release notes.
+- **Publish (`publish.yml`)**: Manual trigger via workflow_dispatch. Publishes to TestPyPI or PyPI using GitHub Actions trusted publishing (id-token).
 
-### Conventional Commits
+### Local Development Hooks
 
-Commit messages are parsed for version bump decisions:
+A pre-commit hook validates commit messages against Conventional Commits format before allowing commits to be staged. Run `git commit` and it will automatically check your message.
 
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) to enable automated versioning and release notes generation.
+
+**Format:**
 ```bash
-feat!: add export command          # MINOR bump (new feature)
-fix: correct query filter NULL     # PATCH bump (bug fix)
-refactor: simplify db init         # No bump (code restructure)
-BREAKING CHANGE: schema change     # MAJOR bump (breaking change)
+<type>[optional scope]!: <description>
+[optional body explaining the change]
+[optional BREAKING CHANGE footer]
 ```
 
-Supported types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`.
+**Version Bump Rules (auto-detected by Hatch in CI):**
+- `feat!` → MINOR bump (new feature)
+- `fix!` → PATCH bump (bug fix)
+- `BREAKING CHANGE:` or `type!: ` → MAJOR bump
+- All other types → no version change
+
+**Supported Types:**
+| Type | Example | Effect |
+|------|---------|--------|
+| `feat` | `feat: add export command` | MINOR (new functionality) |
+| `fix` | `fix: correct query filter NULL` | PATCH (bug fixes) |
+| `docs` | `docs: update README examples` | No bump |
+| `style` | `style: format code with ruff` | No bump |
+| `refactor` | `refactor: simplify db init` | No bump |
+| `perf` | `perf: optimize query execution` | No bump |
+| `test` | `test: add edge case coverage` | No bump |
+| `chore` | `chore: update dependencies` | No bump |
+
+**Examples:**
+```bash
+feat!: add export command          # MINOR (breaking feature)
+fix: correct query filter NULL     # PATCH
+refactor: simplify db init         # No bump
+BREAKING CHANGE: schema change     # MAJOR (when used with type!)
+```
+
+Local commits are validated by pre-commit hooks before being pushed. CI uses Hatch to auto-detect and apply version bumps based on commit types.

@@ -22,3 +22,25 @@ tvo init -d db/training.db # initialize SQLite DB for CLI
 ## DB notes
 - Default path: `db/training.db`.
 - Schema generated at runtime from `LiftEntry` dataclass fields.
+
+## Pre-commit Hooks (Consolidated)
+All linting and validation runs via pre-commit framework before commits are finalized:
+
+```bash
+# Install hooks once
+pre-commit install
+
+# Run all hooks manually
+pre-commit run --all-files
+
+# Auto-update hook versions
+pre-commit autoupdate
+```
+
+**Hooks:**
+- **Ruff**: Lints & formats code in `src/` and `tests/`
+- **Commitlint**: Validates commit message format (Conventional Commits)
+
+**Config files:**
+- `.pre-commit-config.yaml`: Single source of truth for all hooks
+- `.commitlintrc.json`: Shared config for commitlint validation

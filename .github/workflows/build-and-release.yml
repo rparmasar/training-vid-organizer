@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: write
-  packages: write
+  id-token: write # For PyPI trusted publishing
 
 jobs:
   build-and-release:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history for tag parsing and commit analysis
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -25,234 +25,75 @@ jobs:
       - name: Sync dependencies
         run: uv sync
 
-      - name: Run full test suite with coverage
-        run: uv run pytest --cov=src/training_vid_organizer --cov-report=term-missing
+      # Hatch auto-detects semantic version bump from conventional commits
+      - name: Preview version bump (dry-run)
+        run: hatch version bump --dry-run
 
       - name: Build wheel and source distribution
         run: uv run hatch build
 
-      - name: Parse last version from tags
-        id: parse_version
-        run: |
-          # Get all tags sorted by version, take the latest stable one
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          
-          # Extract version components using regex
-          if [[ "$LAST_TAG" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)(?:-(\w+))? ]]; then
-            MAJOR="${BASH_REMATCH[1]}"
-            MINOR="${BASH_REMATCH[2]}"
-            PATCH="${BASH_REMATCH[3]}"
-          else
-            echo "No valid tag found, starting at 0.0.0"
-            MAJOR=0
-            MINOR=0
-            PATCH=0
-          fi
-          
-          # Default to patch bump if no special markers detected
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
-          
-          echo "LAST_TAG=$LAST_TAG" >> $GITHUB_OUTPUT
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+      - name: Run test suite with coverage
+        run: uv run pytest --cov=src/training_vid_organizer --cov-report=term-missing
 
-      - name: Analyze commits for version bump type
-        id: analyze_commits
-        run: |
-          # Get all commits since last tag (or HEAD if no tags)
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
-          if [ -n "$LAST_TAG" ]; then
-            COMMITS=$(git log "${LAST_TAG}..HEAD" --oneline --no-merges)
-          else
-            COMMITS=$(git log HEAD~50..HEAD --oneline --no-merges) # Last 50 commits if no tags
-          fi
-          
-          # Check for BREAKING CHANGE keyword (forces MAJOR bump)
-          if echo "$COMMITS" | grep -qi "BREAKING"; then
-            NEW_MAJOR=$((MAJOR + 1))
-            NEW_MINOR=0
-            NEW_PATCH=0
-            BUMP_TYPE="major"
-          else
-            # Check for feat! prefix (MINOR bump)
-            HAS_Feat=$(echo "$COMMITS" | grep -E "^[a-f0-9]+ feat!")
-            if [ -n "$HAS_Feat" ]; then
-              NEW_MAJOR=$MAJOR
-              NEW_MINOR=$((MINOR + 1))
-              NEW_PATCH=0
-              BUMP_TYPE="minor"
-            else
-              # Default to PATCH bump
-              NEW_MAJOR=$MAJOR
-              NEW_MINOR=$MINOR
-              NEW_PATCH=$((PATCH + 1))
-              BUMP_TYPE="patch"
-            fi
-          fi
-          
-          echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_OUTPUT
-          echo "NEW_VERSION=v${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}" >> $GITHUB_OUTPUT
+      # Hatch applies the auto-detected version bump to pyproject.toml
+      - name: Apply version bump
+        run: hatch version bump
 
-      - name: Update version in pyproject.toml
+      # Create and push annotated tag with release notes
+      - name: Create & push release tag
         run: |
-          NEW_VERSION=$(cat <<EOF)
-            $(git show HEAD:.github/workflows/build-and-release.yml 2>/dev/null || echo "v0.0.1")
-          EOF
-          
-          # Use sed to replace the version line (handles both quoted and unquoted versions)
-          sed -i 's/^\(version[[:space:]]*=[[:space:]]*\)"\?[^"]*\)"\?$/\1'"$NEW_VERSION"'/' pyproject.toml
-
-      - name: Commit version bump
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git add pyproject.toml
-          git commit -m "bump version to $NEW_VERSION" || echo "No changes to commit"
-
-      - name: Create annotated tag
-        run: |
-          NEW_VERSION=$(cat <<EOF)
-            $(git show HEAD:.github/workflows/build-and-release.yml 2>/dev/null || echo "v0.0.1")
-          EOF
-          
+          NEW_VERSION=$(hatch version)
           git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-
-      - name: Push tag and branch
-        run: |
-          NEW_VERSION=$(cat <<EOF)
-            $(git show HEAD:.github/workflows/build-and-release.yml 2>/dev/null || echo "v0.0.1")
-          EOF
-          
           git push origin main
           git push origin "$NEW_VERSION"
 
-      - name: Generate release notes from commits
-        id: generate_release_notes
+      # Generate simple release notes from git log between tags
+      - name: Generate release notes
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          NEW_VERSION=$(hatch version)
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           
-          if [ -n "$LAST_TAG" ]; then
-            COMMITS=$(git log "${LAST_TAG}..HEAD" --format="%h %s (%an)" --no-merges)
+          if [ "$LAST_TAG" = "$NEW_VERSION" ]; then
+            echo "No new commits since last release" > .release_notes.md
           else
-            COMMITS=$(git log HEAD~50..HEAD --format="%h %s (%an)" --no-merges)
+            git log "${LAST_TAG}..HEAD" --oneline --no-merges | \
+              awk '{print "- " $2}' >> .release_notes.md
           fi
-          
-          # Group commits by type and generate markdown release notes
-          cat <<'EOF' > ${{ github.workspace }}.release_notes.md
 
-# Release Notes - ${{ steps.analyze_commits.outputs.NEW_VERSION }}
-
-## Features
-EOF
-          
-          echo "$COMMITS" | grep -E "^[a-f0-9]+ feat!" | while read line; do
-            HASH=$(echo "$line" | awk '{print $1}')
-            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
-            AUTHOR=$(echo "$line" | sed 's/.*(\([^)]*\)).*/\1/')
-            echo "- feat: $SUBJECT ($HASH) - $AUTHOR" >> "${{ github.workspace }}.release_notes.md"
-          done
-          
-          cat <<'EOF' >> ${{ github.workspace }}.release_notes.md
-
-## Bug Fixes
-EOF
-          
-          echo "$COMMITS" | grep -E "^[a-f0-9]+ fix!" | while read line; do
-            HASH=$(echo "$line" | awk '{print $1}')
-            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
-            AUTHOR=$(echo "$line" | sed 's/.*(\([^)]*\)).*/\1/')
-            echo "- fix: $SUBJECT ($HASH) - $AUTHOR" >> "${{ github.workspace }}.release_notes.md"
-          done
-          
-          cat <<'EOF' >> ${{ github.workspace }}.release_notes.md
-
-## Refactoring
-EOF
-          
-          echo "$COMMITS" | grep -E "^[a-f0-9]+ refactor!" | while read line; do
-            HASH=$(echo "$line" | awk '{print $1}')
-            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
-            AUTHOR=$(echo "$line" | sed 's/.*(\([^)]*\)).*/\1/')
-            echo "- refactor: $SUBJECT ($HASH) - $AUTHOR" >> "${{ github.workspace }}.release_notes.md"
-          done
-          
-          cat <<'EOF' >> ${{ github.workspace }}.release_notes.md
-
-## Performance Improvements
-EOF
-          
-          echo "$COMMITS" | grep -E "^[a-f0-9]+ perf!" | while read line; do
-            HASH=$(echo "$line" | awk '{print $1}')
-            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
-            AUTHOR=$(echo "$line" | sed 's/.*(\([^)]*\)).*/\1/')
-            echo "- perf: $SUBJECT ($HASH) - $AUTHOR" >> "${{ github.workspace }}.release_notes.md"
-          done
-          
-          cat <<'EOF' >> ${{ github.workspace }}.release_notes.md
-
-## Documentation
-EOF
-          
-          echo "$COMMITS" | grep -E "^[a-f0-9]+ docs!" | while read line; do
-            HASH=$(echo "$line" | awk '{print $1}')
-            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
-            AUTHOR=$(echo "$line" | sed 's/.*(\([^)]*\)).*/\1/')
-            echo "- docs: $SUBJECT ($HASH) - $AUTHOR" >> "${{ github.workspace }}.release_notes.md"
-          done
-          
-          cat <<'EOF' >> ${{ github.workspace }}.release_notes.md
-
-## Tests
-EOF
-          
-          echo "$COMMITS" | grep -E "^[a-f0-9]+ test!" | while read line; do
-            HASH=$(echo "$line" | awk '{print $1}')
-            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
-            AUTHOR=$(echo "$line" | sed 's/.*(\([^)]*\)).*/\1/')
-            echo "- test: $SUBJECT ($HASH) - $AUTHOR" >> "${{ github.workspace }}.release_notes.md"
-          done
-          
-          cat <<'EOF' >> ${{ github.workspace }}.release_notes.md
-
-## Chores & Maintenance
-EOF
-          
-          echo "$COMMITS" | grep -E "^[a-f0-9]+ chore!" | while read line; do
-            HASH=$(echo "$line" | awk '{print $1}')
-            SUBJECT=$(echo "$line" | cut -d' ' -f2-)
-            AUTHOR=$(echo "$line" | sed 's/.*(\([^)]*\)).*/\1/')
-            echo "- chore: $SUBJECT ($HASH) - $AUTHOR" >> "${{ github.workspace }}.release_notes.md"
-          done
+      - name: Upload distributions as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: distributions-${{ github.ref_name }}
+          path: dist/
 
       - name: Upload release notes artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-notes-${{ steps.analyze_commits.outputs.NEW_VERSION }}
+          name: release-notes-${{ github.ref_name }}
           path: .release_notes.md
 
   publish-release:
     needs: build-and-release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    
+    # Only run when a tag is created (prevents accidental uploads)
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    environment: release # Requires manual approval in GitHub UI
+
     steps:
-      - name: Download release notes
+      - name: Download distributions artifact
         uses: actions/download-artifact@v4
         with:
-          name: release-notes-${{ needs.build-and-release.outputs.NEW_VERSION }}
+          name: distributions-main
+          path: .
 
-      - name: Create GitHub Release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          NEW_VERSION=$(cat <<EOF)
-            $(git show HEAD:.github/workflows/build-and-release.yml 2>/dev/null || echo "v0.0.1")
-          EOF
-          
-          # Create release with auto-generated notes from commit history
-          gh release create "$NEW_VERSION" \
-            --title "Release $NEW_VERSION" \
-            --notes-file .release_notes.md \
-            --generate-notes
+      - name: Validate distributions before upload
+        run: uv run twine check dist/*
+
+      # Publish to PyPI using trusted publishing (no secrets needed)
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          print-hash: true

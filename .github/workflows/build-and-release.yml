@@ -23,22 +23,22 @@ jobs:
           version: "latest"
 
       - name: Sync dependencies
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Build wheel and source distribution
-        run: uv run hatch build
+        run: uvx hatch build
 
       - name: Run test suite with coverage
         run: uv run pytest --cov=src/training_vid_organizer --cov-report=term-missing
 
       # Hatch applies the auto-detected version bump to pyproject.toml
       - name: Apply version bump
-        run: uv run hatch version bump
+        run: uvx hatch version bump
 
       # Create and push annotated tag with release notes
       - name: Create & push release tag
         run: |
-          NEW_VERSION=$(uv run hatch version)
+          NEW_VERSION=$(uvx hatch version)
           git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
           git push origin main
           git push origin "$NEW_VERSION"
@@ -46,7 +46,7 @@ jobs:
       # Generate simple release notes from git log between tags
       - name: Generate release notes
         run: |
-          NEW_VERSION=$(uv run hatch version)
+          NEW_VERSION=$(uvx hatch version)
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           
           if [ "$LAST_TAG" = "$NEW_VERSION" ]; then
@@ -85,7 +85,7 @@ jobs:
           path: .
 
       - name: Validate distributions before upload
-        run: uv run twine check dist/*
+        run: uvx twine check dist/*
 
       # Publish to PyPI using trusted publishing (no secrets needed)
       - name: Publish to PyPI

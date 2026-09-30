@@ -44,7 +44,10 @@ jobs:
           uvx hatch version $BUMP
 
       - name: Build distributions
-        run: uvx hatch build
+        run: |
+          VERSION=$(uvx hatch version)
+          echo "Building distributions for v${VERSION}..."
+          uvx hatch build --clean
 
       - name: Create annotated git tag
         if: startsWith(github.ref, 'refs/tags/v') == false  # Only on push, not tag creation
@@ -87,5 +90,5 @@ jobs:
         if: steps.detect-bump.outputs.bump != 'none' && steps.create-tag.conclusion == 'success'
         uses: pypa/gh-action-pypi-publish@v1.10.3
         with:
-          packages-dist-dir: "dist/"
+          packages-dir: "dist/"
           print-hash: true

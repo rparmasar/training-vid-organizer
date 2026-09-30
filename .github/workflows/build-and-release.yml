@@ -29,7 +29,7 @@ jobs:
         run: uvx hatch build
 
       - name: Run test suite with coverage
-        run: uv run pytest --cov=src/training_vid_organizer --cov-report=term-missing
+        run: uvx pytest --cov=src/training_vid_organizer --cov-report=term-missing
 
       # Hatch applies the auto-detected version bump to pyproject.toml
       - name: Apply version bump

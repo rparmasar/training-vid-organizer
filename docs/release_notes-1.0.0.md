@@ -19,7 +19,8 @@ todo
 
 ### dev-ops related
 
-* implement build script / github actions to build package
+* [done] implement build script / github actions to build and publish package (uses Hatch for versioning + `uv publish` for PyPI)
+* [done] automatic semantic version bumping from conventional commits (`feat:`, `fix:`, etc.)
 * test installing with wheel in fresh virtual env
 
 ### one-time batch job

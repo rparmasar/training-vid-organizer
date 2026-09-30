@@ -9,4 +9,9 @@ if TYPE_CHECKING:
     from .commands.metadata import MetadataExtractor
     from .commands.search import VideoSearcher
 
-__all__ = ["__version__"]
+__all__ = [
+    "__version__",
+    "Categorizer",
+    "MetadataExtractor",
+    "VideoSearcher",
+]

@@ -10,23 +10,25 @@ A CLI tool for organizing training videos and logging lift data with SQLite stor
 - Open video files directly from the database
 - Rich terminal output with tables and colors
 
-## Tech Stack
+## Prerequisites
 
 - Python 3.10+
-- Typer (CLI framework)
-- SQLite (via dynamic schema generation)
-- Rich (terminal UI)
+- `uv` (recommended for dependency management)
 
-## Quick Start
+## Installation
 
 ```bash
 # Install dependencies
 uv sync
+```
 
+## Quick Start
+
+```bash
 # Initialize the database
 tvo init -d db/training.db
 
-# Add a single lift
+# Add a single lift with video
 tvo add lift --date 2026-09-30 --program "Push/Pull/Legs" \
              --iteration 1 --lift squat --weight 225 --reps 8 \
              --top-set -f /videos/squat_20260930.mp4
@@ -47,64 +49,19 @@ tvo update 42 --weight 230
 tvo delete 42 --force
 ```
 
-## Project Structure
+## Command Reference
 
-- `src/training_vid_organizer/` — core package
-  - `cli.py` — Typer app with all commands
-  - `db_handling/db.py` — dynamic SQLite schema from dataclass
-  - `logging_config.py` — structured logging setup
-  - `utils.py` — video path helpers
+| Command | Description |
+|---------|-------------|
+| `tvo init -d <path>` | Initialize SQLite database at given path |
+| `tvo add lift` | Add a single lift entry |
+| `tvo list lifts` | List all logged lifts with filters |
+| `tvo update <id>` | Update an existing lift entry |
+| `tvo delete <id>` | Remove a lift entry from the database |
+| `tvo open` | Open video files associated with entries |
 
 ## Environment Variables
 
-- `TVO_DB_PATH` — override default database location
-- `TVO_VIDEO_DIR` — base directory for video files
-- `TVO_LOG_LEVEL` — set to DEBUG or INFO for verbose output
-
-## CI/CD Workflows
-
-Automated pipelines run on GitHub:
-
-- **CI (`ci.yml`)**: Runs on every commit/PR against main. Executes lint checks and fast tests for developer feedback.
-- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Uses Hatch to auto-detect semantic version bumps from conventional commits, builds distributions, creates annotated tags, and generates release notes. Publishes directly via `uv publish --token ${{ secrets.PYPI_API_TOKEN }}`.
-
-### Local Development Hooks
-
-A pre-commit hook validates commit messages against Conventional Commits format before allowing commits to be staged. Run `git commit` and it will automatically check your message.
-
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) to enable automated versioning and release notes generation.
-
-**Format:**
-```bash
-<type>[optional scope]!: <description>
-[optional body explaining the change]
-[optional BREAKING CHANGE footer]
-```
-
-**Version Bump Rules (auto-detected by Hatch in CI):**
-- `feat!` → MINOR bump (new feature)
-- `fix!` → PATCH bump (bug fix)
-- `BREAKING CHANGE:` or `type!: ` → MAJOR bump
-- All other types → no version change
-
-**Supported Types:**
-| Type | Example | Effect |
-|------|---------|--------|
-| `feat` | `feat: add export command` | MINOR (new functionality) |
-| `fix` | `fix: correct query filter NULL` | PATCH (bug fixes) |
-| `docs` | `docs: update README examples` | No bump |
-| `style` | `style: format code with ruff` | No bump |
-| `refactor` | `refactor: simplify db init` | No bump |
-| `perf` | `perf: optimize query execution` | No bump |
-| `test` | `test: add edge case coverage` | No bump |
-| `chore` | `chore: update dependencies` | No bump |
-
-**Examples:**
-```bash
-feat!: add export command          # MINOR (breaking feature)
-fix: correct query filter NULL     # PATCH
-refactor: simplify db init         # No bump
-BREAKING CHANGE: schema change     # MAJOR (when used with type!)
-```
-
-Local commits are validated by pre-commit hooks before being pushed. CI uses Hatch to auto-detect and apply version bumps based on commit types.
+- `TVO_DB_PATH` — Override default database location
+- `TVO_VIDEO_DIR` — Base directory for video files
+- `TVO_LOG_LEVEL` — Set to DEBUG or INFO for verbose output

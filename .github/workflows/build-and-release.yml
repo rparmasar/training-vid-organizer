@@ -88,7 +88,9 @@ jobs:
 
       - name: Publish to PyPI
         if: steps.detect-bump.outputs.bump != 'none' && steps.create-tag.conclusion == 'success'
-        uses: pypa/gh-action-pypi-publish@v1.10.3
-        with:
-          packages-dir: "dist/"
-          print-hash: true
+        run: |
+          VERSION=$(uvx hatch version)
+          echo "Publishing v${VERSION} to PyPI..."
+          
+          # Use uv publish with id-token authentication (GitHub Actions trusted publishing)
+          uv publish --token ${{ secrets.PYPI_API_TOKEN }}

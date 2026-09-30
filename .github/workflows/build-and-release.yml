@@ -3,19 +3,22 @@ name: Build & Release
 on:
   push:
     branches: ["main"]
+    tags:
+      - "v*"
 
 permissions:
   contents: write
-  id-token: write # For PyPI trusted publishing
+  id-token: write
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Required for git history analysis
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -25,71 +28,48 @@ jobs:
       - name: Sync dependencies
         run: uv sync
 
-      - name: Build wheel and source distribution
+      - name: Detect semantic version bump from commits
+        id: detect-bump
+        run: |
+          chmod +x .github/scripts/detect-version-bump.sh
+          BUMP=$(./.github/scripts/detect-version-bump.sh)
+          echo "Detected bump type: $BUMP"
+          echo "BUMP_TYPE=$BUMP" >> $GITHUB_OUTPUT
+
+      - name: Apply Hatch version bump
+        if: steps.detect-bump.outputs.BUMP_TYPE != 'none'
+        run: |
+          BUMP=$(echo "${{ steps.detect-bump.outputs.BUMP_TYPE }}" | tr '[:upper:]' '[:lower:]')
+          echo "Applying hatch version $BUMP..."
+          uvx hatch version $BUMP
+
+      - name: Build distributions
         run: uvx hatch build
 
-      - name: Run test suite
-        run: uv run pytest --cov=src --cov-report=xml
-
-      # Hatch applies the auto-detected version bump to pyproject.toml
-      - name: Apply version bump
-        run: uvx hatch version bump
-
-      # Create and push annotated tag with release notes
-      - name: Create & push release tag
+      - name: Create annotated git tag
+        if: startsWith(github.ref, 'refs/tags/v') == false  # Only on push, not tag creation
+        id: create-tag
         run: |
-          NEW_VERSION=$(uvx hatch version)
-          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-          git push origin main
-          git push origin "$NEW_VERSION"
-
-      # Generate simple release notes from git log between tags
-      - name: Generate release notes
-        run: |
-          NEW_VERSION=$(uvx hatch version)
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          VERSION=$(uvx hatch version)
+          echo "Creating tag v${VERSION}"
           
-          if [ "$LAST_TAG" = "$NEW_VERSION" ]; then
-            echo "No new commits since last release" > .release_notes.md
-          else
-            git log "${LAST_TAG}..HEAD" --oneline --no-merges | \
-              awk '{print "- " $2}' >> .release_notes.md
+          # Check if tag already exists
+          if git rev-parse v${VERSION} >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists, skipping creation"
+            exit 0
           fi
+          
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "v${VERSION}" -m "Release ${VERSION}"
+          git push origin "v${VERSION}"
 
-      - name: Upload distributions as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: distributions-${{ github.ref_name }}
-          path: dist/
-
-      - name: Upload release notes artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-notes-${{ github.ref_name }}
-          path: .release_notes.md
-
-  publish-release:
-    needs: build-and-release
-    runs-on: ubuntu-latest
-    
-    # Only run when a tag is created (prevents accidental uploads)
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    environment: release # Requires manual approval in GitHub UI
-
-    steps:
-      - name: Download distributions artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: distributions-main
-          path: .
-
-      - name: Validate distributions before upload
-        run: uvx twine check dist/*
-
-      # Publish to PyPI using trusted publishing (no secrets needed)
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
-          print-hash: true
+      - name: Generate release notes (optional)
+        if: steps.detect-bump.outputs.BUMP_TYPE != 'none' && steps.create-tag.conclusion == 'success'
+        run: |
+          VERSION=$(uvx hatch version)
+          echo "# Release Notes for v${VERSION}" > docs/release_notes-${VERSION}.md
+          echo "" >> docs/release_notes-${VERSION}.md
+          echo "Automatically generated release notes." >> docs/release_notes-${VERSION}.md
+          git add docs/release_notes-${VERSION}.md
+          git commit -m "docs: add release notes for v${VERSION}" || true

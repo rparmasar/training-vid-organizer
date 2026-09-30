@@ -1,7 +1,7 @@
 [project]
 name = "training-vid-organizer"
-version = "0.1.0"
-description = "A CLI tool for organizing training videos with metadata extraction, categorization, and search capabilities."
+version = "1.0.0"
+description = "CLI tool for logging training lifts, managing video files, and querying workout data via SQLite"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
@@ -16,7 +16,6 @@ classifiers = [
 ]
 dependencies = [
     "typer[all]>=0.15.0",
-    "pydantic>=2.9.0",
 ]
 
 [project.optional-dependencies]

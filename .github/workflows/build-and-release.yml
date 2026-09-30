@@ -25,10 +25,6 @@ jobs:
       - name: Sync dependencies
         run: uv sync
 
-      # Hatch auto-detects semantic version bump from conventional commits
-      - name: Preview version bump (dry-run)
-        run: hatch version bump --dry-run
-
       - name: Build wheel and source distribution
         run: uv run hatch build
 
@@ -37,12 +33,12 @@ jobs:
 
       # Hatch applies the auto-detected version bump to pyproject.toml
       - name: Apply version bump
-        run: hatch version bump
+        run: uv run hatch version bump
 
       # Create and push annotated tag with release notes
       - name: Create & push release tag
         run: |
-          NEW_VERSION=$(hatch version)
+          NEW_VERSION=$(uv run hatch version)
           git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
           git push origin main
           git push origin "$NEW_VERSION"
@@ -50,7 +46,7 @@ jobs:
       # Generate simple release notes from git log between tags
       - name: Generate release notes
         run: |
-          NEW_VERSION=$(hatch version)
+          NEW_VERSION=$(uv run hatch version)
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           
           if [ "$LAST_TAG" = "$NEW_VERSION" ]; then

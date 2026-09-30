@@ -34,12 +34,12 @@ jobs:
           chmod +x .github/scripts/detect-version-bump.sh
           BUMP=$(./.github/scripts/detect-version-bump.sh)
           echo "Detected bump type: $BUMP"
-          echo "BUMP_TYPE=$BUMP" >> $GITHUB_OUTPUT
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
 
       - name: Apply Hatch version bump
-        if: steps.detect-bump.outputs.BUMP_TYPE != 'none'
+        if: steps.detect-bump.outputs.bump != 'none'
         run: |
-          BUMP=$(echo "${{ steps.detect-bump.outputs.BUMP_TYPE }}" | tr '[:upper:]' '[:lower:]')
+          BUMP=$(echo "${{ steps.detect-bump.outputs.bump }}" | tr '[:upper:]' '[:lower:]')
           echo "Applying hatch version $BUMP..."
           uvx hatch version $BUMP
 
@@ -65,7 +65,7 @@ jobs:
           git push origin "v${VERSION}"
 
       - name: Generate release notes (optional)
-        if: steps.detect-bump.outputs.BUMP_TYPE != 'none' && steps.create-tag.conclusion == 'success'
+        if: steps.detect-bump.outputs.bump != 'none' && steps.create-tag.conclusion == 'success'
         run: |
           VERSION=$(uvx hatch version)
           echo "# Release Notes for v${VERSION}" > docs/release_notes-${VERSION}.md

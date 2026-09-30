@@ -51,5 +51,6 @@ def determine_bump_type(commits):
 if __name__ == "__main__":
     commits = get_commits()
     bump_type = determine_bump_type(commits)
-    print(f"BUMP_TYPE={bump_type}")
+    # Output only the bump type, no label (workflow will handle echo)
+    print(bump_type)
 PYTHON_SCRIPT

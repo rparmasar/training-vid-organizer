@@ -77,15 +77,6 @@ jobs:
           git add docs/release_notes-${VERSION}.md
           git commit -m "docs: add release notes for v${VERSION}" || true
 
-      - name: Publish to TestPyPI (dry run)
-        if: steps.detect-bump.outputs.bump != 'none' && steps.create-tag.conclusion == 'success'
-        id: publish-test
-        run: |
-          VERSION=$(uvx hatch version)
-          echo "Would publish v${VERSION} to https://test.pypi.org/legacy/"
-          # Uncomment to enable actual publishing:
-          # uv publish --index testpypi
-
       - name: Publish to PyPI
         if: steps.detect-bump.outputs.bump != 'none' && steps.create-tag.conclusion == 'success'
         run: |

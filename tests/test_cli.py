@@ -2,6 +2,7 @@ import json
 
 from src.training_vid_organizer.cli import app
 
+
 def test_cli_works(runner):
     """test that the CLI can be run without errors."""
     result = runner.invoke(app, ["--version"])
@@ -16,7 +17,9 @@ def test_cli_init_db_works(runner, tmpdir):
 
 def test_cli_init_db_reset_no_existing(runner, tmpdir):
     """test --reset flag with non-existent DB (no-op)"""
-    result = runner.invoke(app, ["init", "--db-path", tmpdir / "nonexistent.db", "--reset"])
+    result = runner.invoke(
+        app, ["init", "--db-path", tmpdir / "nonexistent.db", "--reset"]
+    )
     assert result.exit_code == 0
 
 
@@ -50,7 +53,9 @@ def test_cli_init_db_reset_with_confirmation(runner, tmpdir):
     assert result.exit_code == 0
 
     # Reset with confirmation (simulate typing 'yes')
-    result = runner.invoke(app, ["init", "--db-path", tmpdir / "test.db", "--reset"], input="y\n")
+    result = runner.invoke(
+        app, ["init", "--db-path", tmpdir / "test.db", "--reset"], input="y\n"
+    )
     assert result.exit_code == 0
 
     # Verify data is gone but DB exists
@@ -96,7 +101,9 @@ def test_cli_init_db_reset_aborted(runner, tmpdir):
     )
 
     # Reset with 'no' confirmation (simulate typing 'n')
-    result = runner.invoke(app, ["init", "--db-path", tmpdir / "test.db", "--reset"], input="n\n")
+    result = runner.invoke(
+        app, ["init", "--db-path", tmpdir / "test.db", "--reset"], input="n\n"
+    )
     assert result.exit_code == 1
     assert "aborted" in result.output.lower()
 
@@ -147,7 +154,7 @@ def test_cli_add_lift_works(runner, tmpdir):
     assert result.exit_code == 0
     assert "added" in result.output
 
-   
+
 def test_cli_add_session_works(runner, tmpdir):
     """test that we can add a session to the db using the cli and a json file"""
     # init db first
@@ -585,108 +592,5 @@ def test_cli_list_lifts_with_limit(runner, tmpdir):
     assert result.exit_code == 0
     lines = [line.strip() for line in result.output.split("\n") if line.strip()]
     # First two lines are header + empty, so data rows start from index 2
-    data_lines = [l for l in lines[2:] if "lift" in l.lower()]
+    data_lines = [line for line in lines[2:] if "lift" in line.lower()]
     assert len(data_lines) == 2
-
-
-def test_cli_init_db_reset_no_existing(runner, tmpdir):
-    """test --reset flag with non-existent DB (no-op)"""
-    result = runner.invoke(app, ["init", "--db-path", tmpdir / "nonexistent.db", "--reset"])
-    assert result.exit_code == 0
-
-
-def test_cli_init_db_reset_with_confirmation(runner, tmpdir):
-    """test --reset flag deletes and recreates existing DB after confirmation"""
-    # Initialize first
-    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
-
-    # Verify data exists
-    result = runner.invoke(
-        app,
-        [
-            "add",
-            "lift",
-            "--db-path",
-            tmpdir / "test.db",
-            "--date",
-            "2023-04-01",
-            "--program",
-            "P9",
-            "--iteration",
-            "1",
-            "--lift",
-            "Bicep Curl",
-            "--weight",
-            "85",
-            "--reps",
-            "4",
-        ],
-    )
-    assert result.exit_code == 0
-
-    # Reset with confirmation (simulate typing 'yes')
-    result = runner.invoke(app, ["init", "--db-path", tmpdir / "test.db", "--reset"], input="y\n")
-    assert result.exit_code == 0
-
-    # Verify data is gone but DB exists
-    result = runner.invoke(
-        app,
-        [
-            "list",
-            "lifts",
-            "--db-path",
-            tmpdir / "test.db",
-        ],
-    )
-    assert result.exit_code == 0
-    output_lower = result.output.lower()
-    assert "no lifts found" in output_lower
-
-
-def test_cli_init_db_reset_aborted(runner, tmpdir):
-    """test --reset flag aborts when user declines confirmation"""
-    # Initialize first
-    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
-
-    # Add some data
-    runner.invoke(
-        app,
-        [
-            "add",
-            "lift",
-            "--db-path",
-            tmpdir / "test.db",
-            "--date",
-            "2023-04-01",
-            "--program",
-            "P9",
-            "--iteration",
-            "1",
-            "--lift",
-            "Bicep Curl",
-            "--weight",
-            "85",
-            "--reps",
-            "4",
-        ],
-    )
-
-    # Reset with 'no' confirmation (simulate typing 'n')
-    result = runner.invoke(app, ["init", "--db-path", tmpdir / "test.db", "--reset"], input="n\n")
-    assert result.exit_code == 1
-    output_lower = result.output.lower()
-    assert "aborted" in output_lower
-
-    # Verify data still exists
-    result = runner.invoke(
-        app,
-        [
-            "list",
-            "lifts",
-            "--db-path",
-            tmpdir / "test.db",
-        ],
-    )
-    assert result.exit_code == 0
-    output_lower = result.output.lower()
-    assert "bicep" in output_lower and "curl" in output_lower

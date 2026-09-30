@@ -1,15 +1,20 @@
-from src.training_vid_organizer.db_handling.query import fetch_lifts, _build_query
-from src.training_vid_organizer.db_handling.db import init_database, LiftEntry, add_lift_entry
+from src.training_vid_organizer.db_handling.db import (
+    LiftEntry,
+    add_lift_entry,
+    init_database,
+)
+from src.training_vid_organizer.db_handling.query import _build_query, fetch_lifts
+
 
 def test_build_query_works_exact_date(all_lift_cols):
     """Test that _build_query returns the correct SQL query for exact date matching."""
     # sample input
-    filter_input = {
-        'date': '2025-03-15'
-    }
+    filter_input = {"date": "2025-03-15"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date = ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE date = ? ORDER BY date DESC"
+    )
     expected_parameter = ["2025-03-15"]
 
     # check success
@@ -21,12 +26,12 @@ def test_build_query_works_exact_date(all_lift_cols):
 def test_build_query_works_partial_date(all_lift_cols):
     """Test that _build_query returns the correct SQL query for partial date matching."""
     # sample input
-    filter_input = {
-        'date': '2025-03'
-    }
+    filter_input = {"date": "2025-03"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date LIKE ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE date LIKE ? ORDER BY date DESC"
+    )
     expected_parameter = ["2025-03%"]
 
     # check success
@@ -38,12 +43,12 @@ def test_build_query_works_partial_date(all_lift_cols):
 def test_build_query_works_lift(all_lift_cols):
     """Test that _build_query returns the correct SQL query for lift matching."""
     # sample input
-    filter_input = {
-        'lift': 'front_squat'
-    }
+    filter_input = {"lift": "front_squat"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE lift = ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE lift = ? ORDER BY date DESC"
+    )
     expected_parameter = ["front_squat"]
 
     # check success
@@ -55,12 +60,12 @@ def test_build_query_works_lift(all_lift_cols):
 def test_build_query_works_program(all_lift_cols):
     """Test that _build_query returns the correct SQL query for program matching."""
     # sample input
-    filter_input = {
-        'program': '531-5+'
-    }
+    filter_input = {"program": "531-5+"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE program = ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE program = ? ORDER BY date DESC"
+    )
     expected_parameter = ["531-5+"]
 
     # check success
@@ -72,12 +77,10 @@ def test_build_query_works_program(all_lift_cols):
 def test_build_query_works_program_iteration(all_lift_cols):
     """Test that _build_query returns the correct SQL query for program_iteration matching."""
     # sample input
-    filter_input = {
-        'program_iteration': '1'
-    }
+    filter_input = {"program_iteration": "1"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE program_iteration = ? ORDER BY date DESC"
+    expected_query = f"SELECT id, {all_lift_cols} FROM lifts WHERE program_iteration = ? ORDER BY date DESC"
     expected_parameter = [1]
 
     # check success
@@ -89,12 +92,12 @@ def test_build_query_works_program_iteration(all_lift_cols):
 def test_build_query_works_weight(all_lift_cols):
     """Test that _build_query returns the correct SQL query for weight matching."""
     # sample input
-    filter_input = {
-        'weight': '275'
-    }
+    filter_input = {"weight": "275"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE weight = ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE weight = ? ORDER BY date DESC"
+    )
     expected_parameter = [275.0]
 
     # check success
@@ -106,12 +109,12 @@ def test_build_query_works_weight(all_lift_cols):
 def test_build_query_works_bodyweight(all_lift_cols):
     """Test that _build_query returns the correct SQL query for bodyweight matching."""
     # sample input
-    filter_input = {
-        'bodyweight': '275'
-    }
+    filter_input = {"bodyweight": "275"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE bodyweight = ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE bodyweight = ? ORDER BY date DESC"
+    )
     expected_parameter = [275.0]
 
     # check success
@@ -123,12 +126,12 @@ def test_build_query_works_bodyweight(all_lift_cols):
 def test_build_query_works_top_set(all_lift_cols):
     """Test that _build_query returns the correct SQL query for top_set matching."""
     # sample input
-    filter_input = {
-        'top_set': True
-    }
+    filter_input = {"top_set": True}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE top_set = ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE top_set = ? ORDER BY date DESC"
+    )
     expected_parameter = [1]
 
     # check success
@@ -140,12 +143,12 @@ def test_build_query_works_top_set(all_lift_cols):
 def test_build_query_works_warm_up_set(all_lift_cols):
     """Test that _build_query returns the correct SQL query for warm_up_set matching."""
     # sample input
-    filter_input = {
-        'warm_up_set': True
-    }
+    filter_input = {"warm_up_set": True}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE warm_up_set = ? ORDER BY date DESC"
+    expected_query = (
+        f"SELECT id, {all_lift_cols} FROM lifts WHERE warm_up_set = ? ORDER BY date DESC"
+    )
     expected_parameter = [1]
 
     # check success
@@ -157,12 +160,10 @@ def test_build_query_works_warm_up_set(all_lift_cols):
 def test_build_query_works_reps_in_reserve(all_lift_cols):
     """Test that _build_query returns the correct SQL query for reps_in_reserve matching."""
     # sample input
-    filter_input = {
-        'reps_in_reserve': 2
-    }
+    filter_input = {"reps_in_reserve": 2}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE reps_in_reserve = ? ORDER BY date DESC"
+    expected_query = f"SELECT id, {all_lift_cols} FROM lifts WHERE reps_in_reserve = ? ORDER BY date DESC"
     expected_parameter = [2]
 
     # check success
@@ -174,14 +175,10 @@ def test_build_query_works_reps_in_reserve(all_lift_cols):
 def test_build_query_works_combination(all_lift_cols):
     """Test that _build_query returns the correct SQL query for a combination of filters."""
     # sample input
-    filter_input = {
-        'lift': 'front_squat',
-        'reps_in_reserve': 2,
-        'date': '2025-02'
-    }
+    filter_input = {"lift": "front_squat", "reps_in_reserve": 2, "date": "2025-02"}
 
     # expected return vals
-    expected_query = f"SELECT {all_lift_cols} FROM lifts WHERE date LIKE ? AND lift = ? AND reps_in_reserve = ? ORDER BY date DESC"
+    expected_query = f"SELECT id, {all_lift_cols} FROM lifts WHERE date LIKE ? AND lift = ? AND reps_in_reserve = ? ORDER BY date DESC"
     expected_parameter = ["2025-02%", "front_squat", 2]
 
     # check success
@@ -194,9 +191,9 @@ def test_build_query_works_empty():
     """Test that _build_query returns the correct SQL query for an empty filter."""
     # sample input
     filter_input = {}
-    
+
     # expected return vals
-    expected_query = "SELECT date, program, program_iteration, lift, weight, reps, bodyweight, top_set, warm_up_set, reps_in_reserve, filename FROM lifts ORDER BY date DESC"
+    expected_query = "SELECT id, date, program, program_iteration, lift, weight, reps, bodyweight, top_set, warm_up_set, reps_in_reserve, filename, entry_id FROM lifts ORDER BY date DESC"
     expected_parameter = []
 
     # check success
@@ -218,19 +215,29 @@ def test_fetch_lifts_works_no_filters(tmpdir):
         lift="Bicep Curl",
         weight=100,
         reps=2,
+        entry_id=None,  # ID is assigned by DB after insertion
     )
-    add_lift_entry(
-        test_db_path,
-        sample_lift_entry
-    )
+    add_lift_entry(test_db_path, sample_lift_entry)
 
     # call fn
     sample_filters = {}
     observed_rows = fetch_lifts(test_db_path, sample_filters)
 
-    # check success
-    assert observed_rows == [sample_lift_entry]
-    
+    # check success (compare all fields except entry_id which is DB-assigned)
+    assert len(observed_rows) == 1
+    fetched = observed_rows[0]
+    assert fetched.date == sample_lift_entry.date
+    assert fetched.program == sample_lift_entry.program
+    assert fetched.program_iteration == sample_lift_entry.program_iteration
+    assert fetched.lift == sample_lift_entry.lift
+    assert fetched.weight == sample_lift_entry.weight
+    assert fetched.reps == sample_lift_entry.reps
+    assert fetched.bodyweight == sample_lift_entry.bodyweight
+    assert fetched.top_set == sample_lift_entry.top_set
+    assert fetched.warm_up_set == sample_lift_entry.warm_up_set
+    assert fetched.reps_in_reserve == sample_lift_entry.reps_in_reserve
+    assert fetched.filename == sample_lift_entry.filename
+
 
 def test_fetch_lifts_works_with_filter(tmpdir):
     # initialize temp db
@@ -245,11 +252,9 @@ def test_fetch_lifts_works_with_filter(tmpdir):
         lift="Bicep Curl",
         weight=100,
         reps=2,
+        entry_id=None,  # ID is assigned by DB after insertion
     )
-    add_lift_entry(
-        test_db_path,
-        sample_lift_entry
-    )
+    add_lift_entry(test_db_path, sample_lift_entry)
 
     # call fn
     sample_filters = {
@@ -257,8 +262,20 @@ def test_fetch_lifts_works_with_filter(tmpdir):
     }
     observed_rows = fetch_lifts(test_db_path, sample_filters)
 
-    # check success
-    assert observed_rows == [sample_lift_entry]
+    # check success (compare all fields except entry_id which is DB-assigned)
+    assert len(observed_rows) == 1
+    fetched = observed_rows[0]
+    assert fetched.date == sample_lift_entry.date
+    assert fetched.program == sample_lift_entry.program
+    assert fetched.program_iteration == sample_lift_entry.program_iteration
+    assert fetched.lift == sample_lift_entry.lift
+    assert fetched.weight == sample_lift_entry.weight
+    assert fetched.reps == sample_lift_entry.reps
+    assert fetched.bodyweight == sample_lift_entry.bodyweight
+    assert fetched.top_set == sample_lift_entry.top_set
+    assert fetched.warm_up_set == sample_lift_entry.warm_up_set
+    assert fetched.reps_in_reserve == sample_lift_entry.reps_in_reserve
+    assert fetched.filename == sample_lift_entry.filename
 
 
 def test_fetch_lifts_works_with_filter_no_matches(tmpdir):
@@ -274,11 +291,9 @@ def test_fetch_lifts_works_with_filter_no_matches(tmpdir):
         lift="Bicep Curl",
         weight=100,
         reps=2,
+        entry_id=None,  # ID is assigned by DB after insertion
     )
-    add_lift_entry(
-        test_db_path,
-        sample_lift_entry
-    )
+    add_lift_entry(test_db_path, sample_lift_entry)
 
     # call fn
     sample_filters = {
@@ -304,11 +319,9 @@ def test_fetch_lifts_works_with_limit(tmpdir):
             lift="Bicep Curl",
             weight=100,
             reps=2,
+            entry_id=None,  # ID is assigned by DB after insertion
         )
-        add_lift_entry(
-            test_db_path,
-            sample_lift_entry
-        )
+        add_lift_entry(test_db_path, sample_lift_entry)
 
     # call fn
     sample_filters = {

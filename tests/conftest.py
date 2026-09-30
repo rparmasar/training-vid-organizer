@@ -1,15 +1,19 @@
 """Shared test fixtures for CLI testing."""
 
 import os
+from dataclasses import fields
+
 import pytest
 from typer.testing import CliRunner
-from dataclasses import fields
+
 from src.training_vid_organizer.db_handling.db import LiftEntry
+
 
 @pytest.fixture()
 def all_lift_cols():
     """Return all fields of LiftEntry."""
     return (", ").join([field.name for field in fields(LiftEntry)])
+
 
 @pytest.fixture(autouse=True)
 def clean_tvo_env():

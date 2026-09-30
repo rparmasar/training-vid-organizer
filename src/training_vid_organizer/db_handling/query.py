@@ -51,6 +51,10 @@ def fetch_lifts(
         for row in rows:
             entry_dict = dict(zip(columns, row))
 
+            # Include 'id' column as entry_id field in LiftEntry model
+            if "id" in entry_dict:
+                entry_dict["entry_id"] = int(entry_dict.pop("id"))
+
             # Convert boolean flags - SQLite returns integers (1/0) or booleans
             for key in ["top_set", "warm_up_set"]:
                 if isinstance(entry_dict[key], int):
@@ -62,6 +66,12 @@ def fetch_lifts(
                     entry_dict["bodyweight"] = float(entry_dict["bodyweight"])
                 except (ValueError, TypeError):
                     pass  # Keep as string if conversion fails
+
+            # Ensure integer fields are ints (SQLite returns floats for REAL type)
+            int_fields = ["program_iteration", "weight", "reps"]
+            for field in int_fields:
+                if isinstance(entry_dict.get(field), float) and entry_dict[field].is_integer():
+                    entry_dict[field] = int(entry_dict[field])
 
             # Handle filename field - ensure it's a Path or None
             if "filename" in entry_dict and isinstance(entry_dict["filename"], str):
@@ -94,7 +104,7 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
     # fetch cols from `LiftEntry`
     all_cols = [field.name for field in fields(LiftEntry)]
 
-    base = f"SELECT {', '.join(all_cols)} FROM lifts"
+    base = f"SELECT id, {', '.join(all_cols)} FROM lifts"
 
     where_clauses: list[str] = []
     params: list[Any] = []

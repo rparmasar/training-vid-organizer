@@ -1,6 +1,8 @@
 import os
-import typer
 from pathlib import Path
+
+import typer
+
 from src.training_vid_organizer.utils import get_config_paths, open_video_file
 
 
@@ -79,12 +81,12 @@ def test_open_video_file_works(tmpdir, monkeypatch):
 
     # mock typer launch
     called_urls = []
-    mock_launch = monkeypatch.setattr(typer, "launch", lambda url: called_urls.append(url))
+    monkeypatch.setattr(typer, "launch", lambda url: called_urls.append(url))
 
     # call fn
     observed_result = open_video_file(input_filename, input_base_dir)
 
-    assert observed_result == True
+    assert observed_result
 
 
 def test_open_video_file_handles_not_found(tmpdir, monkeypatch):
@@ -95,4 +97,4 @@ def test_open_video_file_handles_not_found(tmpdir, monkeypatch):
     # call fn
     observed_result = open_video_file(input_filename, input_base_dir)
 
-    assert observed_result == False
+    assert not observed_result

@@ -25,6 +25,7 @@ def test_add_lift_entry_works(tmpdir):
         lift="Bicep Curl",
         weight=85,
         reps=4,
+        entry_id=None,  # ID is assigned by DB after insertion
     )
 
     # call fn
@@ -47,6 +48,7 @@ def test_add_session_entry_works(tmpdir):
             lift="Bicep Curl",
             weight=85,
             reps=4,
+            entry_id=None,  # ID is assigned by DB after insertion
         ),
         LiftEntry(
             date="2024-04-01",
@@ -55,6 +57,7 @@ def test_add_session_entry_works(tmpdir):
             lift="Tricep Curl",
             weight=85,
             reps=4,
+            entry_id=None,  # ID is assigned by DB after insertion
         ),
     ]
 

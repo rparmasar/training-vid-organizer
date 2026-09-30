@@ -21,6 +21,7 @@ class LiftEntry:
     warm_up_set: bool = False
     reps_in_reserve: int | None = None
     filename: Path | None = None
+    entry_id: int | None = None
 
 
 def _get_sql_type(annotation: Any, default: Any) -> str:

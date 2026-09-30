@@ -15,7 +15,7 @@ todo
 * [done] resetting db
 * [done] update + deleting rows in db (maybe expose a query command for advanced usecases that just executes UPDATE statements?)
 * [done] opening video files based on results of `list lifts` command
-* add help text for commands + options
+* [done] add help text for commands + options
 
 ### dev-ops related
 

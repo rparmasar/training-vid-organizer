@@ -1,11 +1,11 @@
 [project]
 name = "training-vid-organizer"
-version = "0.1.0"
-description = "A CLI tool for organizing training videos with metadata extraction, categorization, and search capabilities."
+version = "1.0.0"
+description = "CLI tool for logging training lifts, managing video files, and querying workout data via SQLite"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
-    { name = "Your Name", email = "you@example.com" },
+    { name = "Rajeev Parmasar", email = "rajeev@parmasar.com" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -16,7 +16,6 @@ classifiers = [
 ]
 dependencies = [
     "typer[all]>=0.15.0",
-    "pydantic>=2.9.0",
 ]
 
 [project.optional-dependencies]
@@ -33,7 +32,6 @@ addopts = "-v --strict-markers"
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-extend-exclude = ["tests/"]
 
 [tool.ruff.lint]
 select = [
@@ -55,7 +53,7 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [project.scripts]
-training-vid-organizer = "training_vid_organizer.cli:app"
+tvo = "training_vid_organizer.cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -63,6 +61,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "ruff>=0.16.8",
 ]

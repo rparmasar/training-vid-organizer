@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches-ignore: ["main"] # Run on all branches except main (CI runs there in build-and-release.yml)
   pull_request:
     branches: ["main"]
 

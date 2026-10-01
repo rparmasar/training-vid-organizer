@@ -2,7 +2,6 @@
 """Calculate next semantic version based on conventional commits."""
 
 import re
-import sys
 
 
 def parse_version(version_str):

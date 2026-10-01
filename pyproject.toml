@@ -1,6 +1,6 @@
 [project]
 name = "training-vid-organizer"
-version = "1.1.1"
+dynamic = ["version"]
 description = "CLI tool for logging training lifts, managing video files, and querying workout data via SQLite"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -63,6 +63,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "src/training_vid_organizer/__about__.py"
+version_scheme = "hatchversion"
 
 [dependency-groups]
 dev = [

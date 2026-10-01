@@ -50,11 +50,7 @@ The schema is derived from the `LiftEntry` dataclass in `cli.py`. Core fields in
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TVO_DB_PATH` | Override database file location | N/A (uses CLI `-d`) |
-| `TVO_VIDEO_DIR` | Base directory for resolving relative video paths | N/A |
-| `TVO_LOG_LEVEL` | Logging verbosity: DEBUG, INFO, WARNING, ERROR | INFO |
+See [README.md](../README.md) for environment variables used to configure CLI behavior.
 
 ## Development Workflow
 
@@ -81,12 +77,10 @@ uv run pytest tests/
 uv run pytest tests/ --cov=src/training_vid_organizer
 ```
 
-## CI/CD Workflows
-
 Automated pipelines run on GitHub:
 
 - **CI (`ci.yml`)**: Triggers on every commit/PR against main. Executes lint checks and fast tests for developer feedback.
-- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Uses Hatch to auto-detect semantic version bumps from conventional commits, builds distributions, creates annotated tags, and generates release notes. Publishes directly via `uv publish --token ${{ secrets.PYPI_API_TOKEN }}`.
+- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Auto-calculates semantic version from conventional commits, updates `__about__.py`, builds distributions, creates tags, and publishes via `uv publish --token ${{ secrets.PYPI_API_TOKEN }}`.
 
 ## Pre-commit Hooks
 
@@ -153,47 +147,9 @@ refactor: simplify db init         # No bump
 BREAKING CHANGE: schema change     # MAJOR (when used with type!)
 ```
 
-## Publishing to PyPI
+## Releases & Versioning
 
-Releases are published via GitHub Actions using `uv publish` directly. This approach was chosen because:
-
-1. **Metadata-Version Compatibility**: Hatch generates wheels with `Metadata-Version: 2.5`, which exceeds the PyPI action's supported range (up to 2.3). Using `uv publish` natively handles newer metadata versions without compatibility issues.
-2. **Simpler Workflow**: Direct execution avoids Docker layer overhead and configuration complexity.
-3. **Trusted Publishing**: Uses GitHub Actions' id-token authentication for secure PyPI uploads.
-
-### Required Secret
-
-To enable publishing, add the following secret to your repository:
-
-1. Go to: Settings → Secrets and variables → Actions → Repository secrets
-2. Click "New repository secret"
-3. Add a secret named `PYPI_API_TOKEN` with your PyPI API token
-
-**How to get your PyPI API token:**
-- Visit https://pypi.org/account/#api
-- Generate an API token (select "Limited access" or "Full access")
-- Copy the generated token and paste it into GitHub Secrets
-
-### Publishing Flow
-
-When a commit with a version bump is pushed:
-
-1. Workflow detects the bump from conventional commits
-2. Creates a git tag matching the new version (e.g., `v1.1.0`)
-3. Builds wheel and source distributions using Hatch
-4. Publishes to PyPI via `uv publish --token ${{ secrets.PYPI_API_TOKEN }}`
-
-### Manual Publishing
-
-For local development or testing:
-
-```bash
-# Build distributions first
-uvx hatch build
-
-# Then publish (requires PYPI_API_TOKEN in GitHub Secrets)
-uv publish --token $PYPI_API_TOKEN
-```
+See [RELEASE.md](./RELEASE.md) for the complete guide on version bumping, publishing workflows, and PyPI deployment.
 
 ## Logging Configuration
 
@@ -209,6 +165,8 @@ To enable verbose output during development:
 export TVO_LOG_LEVEL=DEBUG
 uv run tvo list lifts --debug
 ```
+
+See [README.md](../README.md) for logging level environment variable configuration.
 
 ## Extending the CLI
 
@@ -234,25 +192,40 @@ def export(format: str = "json"):
 
 ## Troubleshooting
 
-### Database Not Found
+See [README.md](../README.md) for common troubleshooting steps.
 
-```bash
-# Reinitialize with explicit path
-tvo init -d db/training.db
-```
+## API Reference
 
-### Video Path Resolution Issues
+### LiftEntry Dataclass Fields
 
-Set `TVO_VIDEO_DIR` to the base directory where videos are stored:
+The core data model is defined in `cli.py` as a Python dataclass. All database operations derive from this schema:
 
-```bash
-export TVO_VIDEO_DIR=/path/to/videos
-```
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | int | Primary key, auto-generated |
+| `date` | str | Training date (YYYY-MM-DD) |
+| `program` | str | Program name (e.g., "Push/Pull/Legs") |
+| `iteration` | int | Iteration number within a program cycle |
+| `lift_name` | str | Exercise name (e.g., "squat", "bench press") |
+| `weight` | float | Weight lifted in kg or lbs |
+| `reps` | int | Number of repetitions |
+| `top_set` | bool | Flag indicating this is a top set |
+| `back_off` | bool | Flag indicating this is a back-off set |
+| `rir` | float | Rating of perceived exertion (0-10) |
+| `video_path` | str | Path to associated video file |
 
-### Linting Errors
+### Database Operations Module Structure
 
-Run pre-commit hooks manually to catch issues before committing:
+#### db_handling/db.py
+- Generates SQLite schema dynamically from LiftEntry fields at runtime
+- Provides connection management and initialization
 
-```bash
-pre-commit run --all-files
-```
+#### db_handling/query.py
+- Implements filtering logic for list operations
+- Supports compound filters: date ranges, program/exercise matching, weight thresholds, RIR values
+- Returns paginated results with count metadata
+
+#### db_handling/update.py
+- Handles single-entry modifications (update/delete)
+- Validates required fields before mutation
+- Uses optimistic locking to prevent concurrent update conflicts

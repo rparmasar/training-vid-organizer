@@ -38,12 +38,18 @@ GROUP BY program_iteration, lift
 ORDER BY program_iteration DESC
 ```
 
+**note:** for both of these, there should be a way to filter lifts that are relevant for a given macro cycle. e.g., I'm not currently deadlifting so it won't make sense to include that lift for comparison. 
+
+in this case, `program_iteration` should always be incrementing but i'll do this manually for now.
+
+however, would need to figure a more robust way to track macro cycles e.g. how to keep track of iterations of coan-phillipe while running 531? (maybe a combination of program + program iteration?)
+
 ## auto-ingesting files + processing
 
 should look like:
 
 1. xtu-go camera plugged into laptop + session json filled out
-2. run some command which: 
+2. run some command (e.g. `tvo import --path-to-camera-videos=... --session-config-path=...`) which: 
    1. maps the files to the `filename` attribute in the session json (can assume the order of the session json will match the order of the videos)
    2. transfers the files to the ssd
    3. adds the session json to the database

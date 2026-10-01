@@ -49,19 +49,10 @@ tvo update 42 --weight 230
 tvo delete 42 --force
 ```
 
-## Command Reference
+## Configuration
 
-| Command | Description |
-|---------|-------------|
-| `tvo init -d <path>` | Initialize SQLite database at given path |
-| `tvo add lift` | Add a single lift entry |
-| `tvo list lifts` | List all logged lifts with filters |
-| `tvo update <id>` | Update an existing lift entry |
-| `tvo delete <id>` | Remove a lift entry from the database |
-| `tvo open` | Open video files associated with entries |
-
-## Environment Variables
+Set environment variables to customize behavior:
 
 - `TVO_DB_PATH` — Override default database location
-- `TVO_VIDEO_DIR` — Base directory for video files
+- `TVO_VIDEO_DIR` — Base directory for resolving relative video paths
 - `TVO_LOG_LEVEL` — Set to DEBUG or INFO for verbose output

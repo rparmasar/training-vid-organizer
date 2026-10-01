@@ -20,16 +20,20 @@ jobs:
 
       - name: Bump version using bump-my-version
         id: bump
-        uses: callowayproject/bump-my-version@master
-        with:
-          args: ""
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check if version was bumped
-        if: steps.bump.outputs.bumped == 'true'
         run: |
-          echo "Version bumped from ${{ steps.bump.outputs.previous-version }}" \
-               "to ${{ steps.bump.outputs.current-version }}"
+          # Install latest available bump-my-version (upstream pinned to 1.5.2, but we use latest)
+          uv tool install "bump-my-version" || pip install "bump-my-version>=1.4.0"
+          
+          # Get current version before bump
+          echo "previous-version=$(uvx hatch version)" >> $GITHUB_OUTPUT
+          
+          # Auto-detect and apply version bump from conventional commits
+          uvx bump-my-version bump --allow-dirty || exit 1
+          
+          # Get new version after bump
+          echo "current-version=$(uvx hatch version)" >> $GITHUB_OUTPUT
+          
+          echo "bumped=true" >> $GITHUB_OUTPUT
 
       - name: Build distributions (only on bump)
         if: steps.bump.outputs.bumped == 'true'

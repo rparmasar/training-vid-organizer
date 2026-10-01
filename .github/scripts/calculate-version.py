@@ -35,13 +35,21 @@ def format_version(major, minor, patch):
 
 if __name__ == "__main__":
     import argparse
-    
-    parser = argparse.ArgumentParser(description="Calculate next semantic version based on bump type")
-    parser.add_argument("--bump-type", default="none", help="Type of version bump (major/minor/micro/patch)")
-    parser.add_argument("--current-version", default="0.0.0", help="Current version string")
-    
+
+    parser = argparse.ArgumentParser(
+        description="Calculate next semantic version based on bump type"
+    )
+    parser.add_argument(
+        "--bump-type",
+        default="none",
+        help="Type of version bump (major/minor/micro/patch)",
+    )
+    parser.add_argument(
+        "--current-version", default="0.0.0", help="Current version string"
+    )
+
     args = parser.parse_args()
-    
+
     bump_type = args.bump_type.lower()
     current_version = args.current_version
 

@@ -21,26 +21,28 @@ jobs:
       - name: Bump version using bump-my-version
         id: bump
         run: |
-          # Install latest available bump-my-version (upstream pinned to 1.5.2, but we use latest)
-          uv tool install "bump-my-version" || pip install "bump-my-version>=1.4.0"
+          # Install bump-my-version via pip (standard in runners)
+          pip install "bump-my-version>=1.4.0"
           
-          # Get current version before bump
-          echo "previous-version=$(uvx hatch version)" >> $GITHUB_OUTPUT
+          # Get current version before bump from hatch config
+          echo "previous-version=$(python -m hatch.version)" >> $GITHUB_OUTPUT
           
           # Auto-detect and apply version bump from conventional commits
-          uvx bump-my-version bump --allow-dirty || exit 1
+          bump-my-version bump --allow-dirty || exit 1
           
-          # Get new version after bump
-          echo "current-version=$(uvx hatch version)" >> $GITHUB_OUTPUT
+          # Get new version after bump from hatch config
+          echo "current-version=$(python -m hatch.version)" >> $GITHUB_OUTPUT
           
           echo "bumped=true" >> $GITHUB_OUTPUT
 
       - name: Build distributions (only on bump)
         if: steps.bump.outputs.bumped == 'true'
-        run: uvx hatch build --clean
+        run: python -m hatch build --clean
 
       - name: Publish to PyPI (only on bump)
         if: steps.bump.outputs.bumped == 'true'
         run: |
           echo "Publishing ${{ steps.bump.outputs.current-version }} to PyPI..."
-          uv publish --token ${{ secrets.PYPI_API_TOKEN }}
+          pip install twine
+          python -m twine upload --repository-url https://upload.pypi.org/legacy/ \
+            --username __token__ --password ${{ secrets.PYPI_API_TOKEN }} dist/*

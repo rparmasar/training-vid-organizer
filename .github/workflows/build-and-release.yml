@@ -67,16 +67,6 @@ jobs:
           git tag -a "v${VERSION}" -m "Release ${VERSION}"
           git push origin "v${VERSION}"
 
-      - name: Generate release notes (optional)
-        if: steps.detect-bump.outputs.bump != 'none' && steps.create-tag.conclusion == 'success'
-        run: |
-          VERSION=$(uvx hatch version)
-          echo "# Release Notes for v${VERSION}" > docs/release_notes-${VERSION}.md
-          echo "" >> docs/release_notes-${VERSION}.md
-          echo "Automatically generated release notes." >> docs/release_notes-${VERSION}.md
-          git add docs/release_notes-${VERSION}.md
-          git commit -m "docs: add release notes for v${VERSION}" || true
-
       - name: Publish to PyPI
         if: steps.detect-bump.outputs.bump != 'none' && steps.create-tag.conclusion == 'success'
         run: |

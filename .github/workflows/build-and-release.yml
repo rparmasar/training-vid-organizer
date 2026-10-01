@@ -21,8 +21,8 @@ jobs:
       - name: Bump version using bump-my-version
         id: bump
         run: |
-          # Install bump-my-version via pip (standard in runners)
-          pip install "bump-my-version>=1.4.0"
+          # Install hatch and bump-my-version via pip (standard in runners)
+          pip install "hatch>=1.8.0" "bump-my-version>=1.4.0"
           
           # Get current version before bump from hatch config
           echo "previous-version=$(python -m hatch.version)" >> $GITHUB_OUTPUT

@@ -42,11 +42,12 @@ jobs:
             NEXT_VERSION="$CURRENT"
           else
             # Calculate next semantic version using helper script
-            export BUMP_TYPE CURRENT_VERSION
             python3 .github/scripts/calculate-version.py \
               --bump-type "$BUMP_TYPE" \
-              --current-version "$CURRENT" >/dev/null 2>&1
-            NEXT_VERSION=$(python3 .github/scripts/calculate-version.py)
+              --current-version "$CURRENT"
+            NEXT_VERSION=$(python3 .github/scripts/calculate-version.py \
+              --bump-type "$BUMP_TYPE" \
+              --current-version "$CURRENT")
           fi
           
           echo "Current version: $CURRENT"
@@ -72,7 +73,7 @@ jobs:
           
           # Stage and commit the version change
           git add src/training_vid_organizer/__about__.py
-          git commit --no-verify -m "[ci skip] Bump version to ${VERSION}" || echo "No changes to commit (already up to date)"
+          git commit --no-verify -m "[ci skip] bump version to ${VERSION}" || echo "No changes to commit (already up to date)"
 
       - name: Build distributions
         run: |

@@ -23,6 +23,11 @@ jobs:
         with:
           version: "latest"
 
+      - name: Configure git identity for tagging
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions Bot"
+      
       - name: Bump version from conventional commits
         run: |
           # Get last tag
@@ -55,11 +60,6 @@ jobs:
 
       - name: Build distributions
         run: uv build
-
-      - name: Configure git identity for tagging
-        run: |
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "GitHub Actions Bot"
 
       - name: Create release tag
         run: |

@@ -46,27 +46,22 @@ jobs:
           echo "Bumping version by: $VERSION_BUMP"
           uv version --bump $VERSION_BUMP
 
-      - name: Commit and push version bump (skip pre-commit hooks)
+      - name: Commit and push version bump (skip CI)
         run: |
-          # Disable pre-commit hooks to avoid re-triggering CI on this commit
-          git config core.hooksPath /dev/null
-          
+          # Use [skip ci] marker to prevent re-triggering on this commit
           git add pyproject.toml
-          git commit --no-verify -m "chore: bump version via CI" || echo "No changes to commit"
-          
-          # Re-enable hooks for subsequent steps
-          git config core.hooksPath .git/hooks
+          git commit --no-verify -m "[skip ci] chore: bump version via CI" || echo "No changes to commit"
 
       - name: Push version bump
         run: |
-          # Skip push if no commits were made (no changes detected)
+          # Always push the version bump commit
           if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
             echo "Pushing version bump commit..."
             git push origin HEAD
           else
-            echo "No new commits to push"
+            echo "No previous commits to compare against"
           fi
-      
+
       - name: Build distributions
         run: uv build
 

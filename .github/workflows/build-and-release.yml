@@ -51,16 +51,7 @@ jobs:
           # Use [skip ci] marker to prevent re-triggering on this commit
           git add pyproject.toml
           git commit --no-verify -m "[skip ci] chore: bump version via CI" || echo "No changes to commit"
-
-      - name: Push version bump
-        run: |
-          # Always push the version bump commit
-          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-            echo "Pushing version bump commit..."
-            git push origin HEAD
-          else
-            echo "No previous commits to compare against"
-          fi
+          git push origin HEAD
 
       - name: Build distributions
         run: uv build

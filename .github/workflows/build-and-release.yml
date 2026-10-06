@@ -23,8 +23,38 @@ jobs:
         with:
           version: "latest"
 
+      - name: Bump version from conventional commits
+        run: |
+          # Get last tag
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          
+          # Extract commit types between last tag and HEAD (inclusive)
+          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s")
+          
+          # Check for highest priority type first, then fall through to lower priorities
+          if echo "$COMMITS" | grep -qE 'BREAKING CHANGE!'; then
+            VERSION_BUMP="major"
+          elif echo "$COMMITS" | grep -qE '(feat|perf)' ; then
+            VERSION_BUMP="minor"
+          elif echo "$COMMITS" | grep -qE '(fix|refactor)' ; then
+            VERSION_BUMP="patch"
+          else
+            # Default to minor if no conventional commits found
+            VERSION_BUMP="minor"
+          fi
+          
+          echo "Bumping version by: $VERSION_BUMP"
+          uv version --bump $VERSION_BUMP
+      
       - name: Build distributions
         run: uv build
+
+      - name: Create release tag
+        run: |
+          VERSION=$(uv version)
+          echo "Creating tag v${VERSION}"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
 
       - name: Publish to PyPI
         run: uv publish --token ${{ secrets.PYPI_API_TOKEN }}

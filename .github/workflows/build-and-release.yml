@@ -56,9 +56,14 @@ jobs:
       - name: Build distributions
         run: uv build
 
+      - name: Configure git identity for tagging
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "GitHub Actions Bot"
+
       - name: Create release tag
         run: |
-          VERSION=$(uv version --short)
+          VERSION=$(uv version)
           echo "Creating tag v${VERSION}"
           git tag -a "v${VERSION}" -m "Release v${VERSION}"
           git push origin "v${VERSION}"

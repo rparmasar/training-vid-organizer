@@ -80,7 +80,7 @@ uv run pytest tests/ --cov=src/training_vid_organizer
 Automated pipelines run on GitHub:
 
 - **CI (`ci.yml`)**: Triggers on push to non-main branches and pull requests against main. Executes lint checks and fast tests for developer feedback.
-- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Builds distributions and publishes via `uv publish --token ${{ secrets.PYPI_API_TOKEN }}`.
+- **Build & Release (`build-and-release.yml`)**: Triggers on push to `main`. Detects version bump from conventional commits, builds distributions, creates release tag, and publishes via `uv publish --token ${{ secrets.PYPI_API_TOKEN }}`.
 
 ## Pre-commit Hooks
 

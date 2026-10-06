@@ -23,7 +23,7 @@ jobs:
         with:
           version: "latest"
 
-      - name: Bump version from conventional commits
+       - name: Bump version from conventional commits
         run: |
           # Get last tag
           LAST_TAG=$(git describe --tags --abbrev=0)
@@ -45,6 +45,27 @@ jobs:
           
           echo "Bumping version by: $VERSION_BUMP"
           uv version --bump $VERSION_BUMP
+
+       - name: Commit and push version bump (skip pre-commit hooks)
+        run: |
+          # Disable pre-commit hooks to avoid re-triggering CI on this commit
+          git config core.hooksPath /dev/null
+          
+          git add pyproject.toml
+          git commit --no-verify -m "chore: bump version via CI" || echo "No changes to commit"
+          
+          # Re-enable hooks for subsequent steps
+          git config core.hooksPath .git/hooks
+
+       - name: Push version bump
+        run: |
+          # Skip push if no commits were made (no changes detected)
+          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            echo "Pushing version bump commit..."
+            git push origin HEAD
+          else
+            echo "No new commits to push"
+          fi
       
       - name: Build distributions
         run: uv build

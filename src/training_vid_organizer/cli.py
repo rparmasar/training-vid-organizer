@@ -12,14 +12,14 @@ from rich.console import Console
 from rich.table import Table
 from typer import Argument, Option, Typer, confirm, echo
 
-from training_vid_organizer.__init__ import __version__
+from training_vid_organizer.__about__ import __version__
 from training_vid_organizer.db_handling.db import (
     LiftEntry,
     add_lift_entry,
     add_session_entry,
     init_database,
 )
-from training_vid_organizer.db_handling.query import fetch_lifts
+from training_vid_organizer.db_handling.query import analyze_lifts, fetch_lifts
 from training_vid_organizer.db_handling.update import (
     delete_lift_entry,
     update_lift_entry,
@@ -600,6 +600,42 @@ def open_files(
 
     for filepath in unique_files:
         open_video_file(filepath, base_dir)
+
+
+@app.command("analyze")
+def analyze(
+    metric: Annotated[str, Argument(help="metric to analyze (estimated_1rm | total_set_volume)")] = "",
+    db_path: Annotated[
+        str | None, Option("--db-path", "-d", help="override database path")
+    ] = None,
+):
+    """Run comparison analysis across program iterations."""
+
+    effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
+
+    # Call pure helper function (handles connection internally)
+    results = analyze_lifts(effective_db_path, metric)
+
+    if not results:
+        console.print("[dim]No data found for analysis.[/dim]")
+        return
+
+    # Render as Rich table (same pattern as list_lifts)
+    table = Table(box=None, show_header=True, header_style="bold")
+    table.add_column("Iteration", style="cyan")
+    table.add_column("Lift", style="magenta")
+    table.add_column(f"Avg {metric.replace('_', ' ').title()}", justify="right")
+    table.add_column("Avg Bodyweight (lbs)", justify="right")
+
+    for iteration, lift, metric_val, bw in results:
+        table.add_row(
+            str(iteration),
+            lift,
+            f"{metric_val:.2f}" if metric_val is not None else "-",
+            f"{bw:.1f}" if bw is not None else "-"
+        )
+
+    console.print(table)
 
 
 if __name__ == "__main__":

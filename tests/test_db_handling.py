@@ -1,11 +1,10 @@
+
 from src.training_vid_organizer.db_handling.db import (
-    init_database,
+    LiftEntry,
     add_lift_entry,
     add_session_entry,
-    LiftEntry,
+    init_database,
 )
-
-import json
 
 
 def test_init_database_works(tmpdir):
@@ -66,4 +65,3 @@ def test_add_session_entry_works(tmpdir):
 
     # two rows should be affected
     assert OBSERVED_OUTPUT == 2
-

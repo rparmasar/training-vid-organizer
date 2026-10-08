@@ -7,14 +7,14 @@ from typing import Any
 
 from training_vid_organizer.logging_config import logger as tv_logger
 
-from .db import LiftEntry
+from .db import LiftEntry, LiftResult
 
 
 def fetch_lifts(
     db_path: Path,
     filters: dict[str, Any],
     limit: int | None = 100,
-) -> list[LiftEntry]:
+) -> list[LiftResult]:
     """Execute a parameterized query and return LiftEntry objects.
 
     Args:
@@ -46,12 +46,12 @@ def fetch_lifts(
 
         tv_logger.debug(f"fetched {len(rows)} lift(s) with filters={filters}")
 
-        # Map raw tuples to LiftEntry instances
+        # Map raw tuples to LiftResult instances
         entries = []
         for row in rows:
             entry_dict = dict(zip(columns, row))
 
-            # Include 'id' column as entry_id field in LiftEntry model
+            # Map 'id' column to 'entry_id' field (backward compat)
             if "id" in entry_dict:
                 entry_dict["entry_id"] = int(entry_dict.pop("id"))
 
@@ -70,14 +70,26 @@ def fetch_lifts(
             # Ensure integer fields are ints (SQLite returns floats for REAL type)
             int_fields = ["program_iteration", "weight", "reps"]
             for field in int_fields:
-                if isinstance(entry_dict.get(field), float) and entry_dict[field].is_integer():
+                if (
+                    isinstance(entry_dict.get(field), float)
+                    and entry_dict[field].is_integer()
+                ):
                     entry_dict[field] = int(entry_dict[field])
 
             # Handle filename field - ensure it's a Path or None
             if "filename" in entry_dict and isinstance(entry_dict["filename"], str):
                 entry_dict["filename"] = Path(entry_dict["filename"])
 
-            entries.append(LiftEntry(**entry_dict))
+            # Convert stored virtual columns from DB values
+            if "estimated_1rm" in entry_dict and "total_set_volume" in entry_dict:
+                entry_dict["estimated_1rm"] = (
+                    float(entry_dict["estimated_1rm"])
+                    if entry_dict["estimated_1rm"]
+                    else None
+                )
+                entry_dict["total_set_volume"] = float(entry_dict["total_set_volume"])
+
+            entries.append(LiftResult(**entry_dict))
 
         return entries
 
@@ -165,3 +177,64 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
 
     tv_logger.debug(f"_build_query generated: {sql}, params={params}")
     return final_sql, params
+
+
+def analyze_lifts(
+    db_path: Path, metric: str = "estimated_1rm"
+) -> list[tuple[int, str, float | None, float | None]]:
+    """Run program iteration comparison analysis.
+
+    Returns list of (program_iteration, lift, avg_metric_value, avg_bodyweight).
+    """
+
+    if metric == "estimated_1rm":
+        col = "estimated_1rm"
+        alias = "avg_estimated_1rm"
+    elif metric == "total_set_volume":
+        col = "total_set_volume"
+        alias = "avg_total_set_volume"
+    else:
+        raise ValueError(f"Unknown metric: {metric}")
+
+    query = f"""
+        SELECT
+            program_iteration,
+            lift,
+            AVG({col}) as {alias},
+            AVG(bodyweight) as avg_bodyweight
+        FROM lifts
+        WHERE {col} IS NOT NULL
+        GROUP BY program_iteration, lift
+        ORDER BY program_iteration DESC
+    """
+
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+
+        rows = cursor.fetchall()
+
+        if not rows or not cursor.description:
+            return []
+
+        columns = [desc[0] for desc in cursor.description]
+
+        results = []
+        for row in rows:
+            entry_dict = dict(zip(columns, row))
+            results.append(
+                (
+                    int(entry_dict["program_iteration"]),
+                    str(entry_dict["lift"]),
+                    float(entry_dict[alias]) if entry_dict[alias] else None,
+                    float(entry_dict["avg_bodyweight"])
+                    if entry_dict["avg_bodyweight"]
+                    else None,
+                )
+            )
+
+        return results
+
+    finally:
+        conn.close()

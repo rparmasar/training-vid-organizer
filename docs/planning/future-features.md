@@ -1,6 +1,6 @@
 # future features
 
-## calculated views  
+## [DONE] calculated views
 
 these are metrics computed from the data in the db and should
 

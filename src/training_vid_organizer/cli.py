@@ -299,6 +299,8 @@ def list_lifts(
         ("bodyweight", None, "right", None),
         ("type_label", "dim", None, None),
         ("filename", None, None, None),
+        ("estimated_1rm", None, "right", None),
+        ("total_set_volume", None, "right", None),
     ]
 
     for name, style, justify, width in col_defs:
@@ -312,6 +314,8 @@ def list_lifts(
             "bodyweight": "bw (lbs)",
             "type_label": "type",
             "filename": "file",
+            "estimated_1rm": "est. 1RM",
+            "total_set_volume": "set volume",
         }[name]
         table.add_column(label, style=style, justify=justify, width=width)
 
@@ -325,6 +329,10 @@ def list_lifts(
 
         filepath_str = str(entry.filename) if entry.filename else "-"
 
+        # Format virtual columns - handle None values gracefully
+        est_1rm_str = f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
+        volume_str = f"{entry.total_set_volume:.2f}" if entry.total_set_volume is not None else "-"
+
         table.add_row(
             str(entry.date),
             str(entry.program),
@@ -335,6 +343,8 @@ def list_lifts(
             f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
             type_label,
             filepath_str,
+            est_1rm_str,
+            volume_str,
         )
 
     # Add ID column header after the table is built
@@ -353,6 +363,10 @@ def list_lifts(
 
         filepath_str = str(entry.filename) if entry.filename else "-"
 
+        # Format virtual columns - handle None values gracefully
+        est_1rm_str = f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
+        volume_str = f"{entry.total_set_volume:.2f}" if entry.total_set_volume is not None else "-"
+
         table.add_row(
             str(entry.date),
             str(entry.program),
@@ -363,6 +377,8 @@ def list_lifts(
             f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
             type_label,
             filepath_str,
+            est_1rm_str,
+            volume_str,
             str(entry.entry_id) if entry.entry_id else "-",
         )
 

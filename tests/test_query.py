@@ -331,3 +331,113 @@ def test_fetch_lifts_works_with_limit(tmpdir):
 
     # check success
     assert len(observed_rows) == 2
+
+
+def test_fetch_lifts_includes_virtual_columns(tmpdir):
+    """Test that virtual columns are included in fetch results."""
+    init_database(tmpdir / "test.db")
+
+    sample_lift_entry = LiftEntry(
+        date="2025-01-01",
+        program="Test Program",
+        program_iteration=1,
+        lift="Squat",
+        weight=200,
+        reps=5,  # 1RM = 200*36/(37-5) = 228.57
+        entry_id=None,
+    )
+    add_lift_entry(tmpdir / "test.db", sample_lift_entry)
+
+    observed_rows = fetch_lifts(tmpdir / "test.db", {})
+    assert len(observed_rows) == 1
+    fetched = observed_rows[0]
+
+    # Virtual columns should be present in the result object (LiftResult dataclass)
+    assert hasattr(fetched, "estimated_1rm"), "estimated_1rm attribute missing"
+    assert hasattr(fetched, "total_set_volume"), "total_set_volume attribute missing"
+
+    # Values should match expected calculations (Bryzycki: 200*36/(37-5)=225)
+    assert fetched.estimated_1rm == 225.0, f"Expected 225.0, got {fetched.estimated_1rm}"
+    assert fetched.total_set_volume == 1000.0, f"Expected 1000.0, got {fetched.total_set_volume}"
+
+
+def test_fetch_lifts_virtual_columns_with_filter(tmpdir):
+    """Test that virtual columns work correctly with filtered queries."""
+    init_database(tmpdir / "test.db")
+
+    # Add multiple entries for same program_iteration/lift combination
+    weights_reps = [(200, 5), (210, 4), (190, 6)]
+    for weight, reps in weights_reps:
+        sample_lift_entry = LiftEntry(
+            date=f"2025-01-{(weights_reps.index((weight, reps)) + 1):02d}",
+            program="Test Program",
+            program_iteration=1,
+            lift="Squat",
+            weight=weight,
+            reps=reps,
+            entry_id=None,
+        )
+        add_lift_entry(tmpdir / "test.db", sample_lift_entry)
+
+    # Fetch with filter for this program_iteration and lift
+    observed_rows = fetch_lifts(
+        tmpdir / "test.db", {"program_iteration": 1, "lift": "Squat"}
+    )
+    assert len(observed_rows) == 3
+
+    # Verify virtual columns are present in all results (LiftResult dataclass)
+    for row in observed_rows:
+        assert hasattr(row, "estimated_1rm"), f"Row missing estimated_1rm: {row}"
+        assert hasattr(row, "total_set_volume"), f"Row missing total_set_volume: {row}"
+
+
+def test_fetch_lifts_virtual_columns_aggregation(tmpdir):
+    """Test that virtual columns work correctly with aggregation queries."""
+    init_database(tmpdir / "test.db")
+
+    # Add multiple entries for same program_iteration/lift combination
+    weights_reps = [(200, 5), (210, 4), (190, 6)]
+    for weight, reps in weights_reps:
+        sample_lift_entry = LiftEntry(
+            date=f"2025-01-{(weights_reps.index((weight, reps)) + 1):02d}",
+            program="Test Program",
+            program_iteration=1,
+            lift="Squat",
+            weight=weight,
+            reps=reps,
+            entry_id=None,
+        )
+        add_lift_entry(tmpdir / "test.db", sample_lift_entry)
+
+    # Fetch all entries and verify virtual columns are present
+    observed_rows = fetch_lifts(tmpdir / "test.db", {})
+    assert len(observed_rows) == 3
+
+    # Verify each row has the expected virtual column values (LiftResult dataclass)
+    for row in observed_rows:
+        assert row.estimated_1rm is not None or row.reps == 0, f"Row missing estimated_1rm: {row}"
+        assert row.total_set_volume is not None, f"Row missing total_set_volume: {row}"
+
+
+def test_fetch_lifts_virtual_columns_edge_case(tmpdir):
+    """Test that virtual columns handle edge cases correctly."""
+    init_database(tmpdir / "test.db")
+
+    # Edge case: reps=0 should return None for estimated_1rm
+    sample_lift_entry = LiftEntry(
+        date="2025-01-01",
+        program="Test Program",
+        program_iteration=1,
+        lift="Squat",
+        weight=200,
+        reps=0,  # Invalid reps
+        entry_id=None,
+    )
+    add_lift_entry(tmpdir / "test.db", sample_lift_entry)
+
+    observed_rows = fetch_lifts(tmpdir / "test.db", {})
+    assert len(observed_rows) == 1
+    fetched = observed_rows[0]
+
+    # estimated_1rm should be None for reps=0
+    assert fetched.estimated_1rm is None, f"Expected None for reps=0, got {fetched.estimated_1rm}"

@@ -1,6 +1,6 @@
 [project]
 name = "training-vid-organizer"
-version = "0.2.1"
+version = "0.3.0"
 description = "CLI tool for logging training lifts, managing video files, and querying workout data via SQLite"
 readme = "README.md"
 requires-python = ">=3.12"

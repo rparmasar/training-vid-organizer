@@ -12,7 +12,6 @@ from rich.console import Console
 from rich.table import Table
 from typer import Argument, Option, Typer, confirm, echo
 
-from training_vid_organizer.__about__ import __version__
 from training_vid_organizer.db_handling.db import (
     LiftEntry,
     add_lift_entry,
@@ -64,7 +63,10 @@ def callback(
 ):
     """main callback for the cli"""
     if version:
-        echo(f"training-vid-organizer v{__version__}")
+        from importlib import metadata
+
+        version = metadata.version("training-vid-organizer")
+        echo(f"training-vid-organizer v{version}")
 
 
 @app.command("init")
@@ -330,8 +332,14 @@ def list_lifts(
         filepath_str = str(entry.filename) if entry.filename else "-"
 
         # Format virtual columns - handle None values gracefully
-        est_1rm_str = f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
-        volume_str = f"{entry.total_set_volume:.2f}" if entry.total_set_volume is not None else "-"
+        est_1rm_str = (
+            f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
+        )
+        volume_str = (
+            f"{entry.total_set_volume:.2f}"
+            if entry.total_set_volume is not None
+            else "-"
+        )
 
         table.add_row(
             str(entry.date),
@@ -364,8 +372,14 @@ def list_lifts(
         filepath_str = str(entry.filename) if entry.filename else "-"
 
         # Format virtual columns - handle None values gracefully
-        est_1rm_str = f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
-        volume_str = f"{entry.total_set_volume:.2f}" if entry.total_set_volume is not None else "-"
+        est_1rm_str = (
+            f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
+        )
+        volume_str = (
+            f"{entry.total_set_volume:.2f}"
+            if entry.total_set_volume is not None
+            else "-"
+        )
 
         table.add_row(
             str(entry.date),
@@ -620,7 +634,9 @@ def open_files(
 
 @app.command("analyze")
 def analyze(
-    metric: Annotated[str, Argument(help="metric to analyze (estimated_1rm | total_set_volume)")] = "",
+    metric: Annotated[
+        str, Argument(help="metric to analyze (estimated_1rm | total_set_volume)")
+    ] = "",
     db_path: Annotated[
         str | None, Option("--db-path", "-d", help="override database path")
     ] = None,
@@ -648,7 +664,7 @@ def analyze(
             str(iteration),
             lift,
             f"{metric_val:.2f}" if metric_val is not None else "-",
-            f"{bw:.1f}" if bw is not None else "-"
+            f"{bw:.1f}" if bw is not None else "-",
         )
 
     console.print(table)

@@ -146,9 +146,7 @@ def test_build_query_works_warm_up_set(all_lift_cols):
     filter_input = {"warm_up_set": True}
 
     # expected return vals
-    expected_query = (
-        f"SELECT id, {all_lift_cols} FROM lifts WHERE warm_up_set = ? ORDER BY date DESC"
-    )
+    expected_query = f"SELECT id, {all_lift_cols} FROM lifts WHERE warm_up_set = ? ORDER BY date DESC"
     expected_parameter = [1]
 
     # check success
@@ -357,8 +355,12 @@ def test_fetch_lifts_includes_virtual_columns(tmpdir):
     assert hasattr(fetched, "total_set_volume"), "total_set_volume attribute missing"
 
     # Values should match expected calculations (Bryzycki: 200*36/(37-5)=225)
-    assert fetched.estimated_1rm == 225.0, f"Expected 225.0, got {fetched.estimated_1rm}"
-    assert fetched.total_set_volume == 1000.0, f"Expected 1000.0, got {fetched.total_set_volume}"
+    assert fetched.estimated_1rm == 225.0, (
+        f"Expected 225.0, got {fetched.estimated_1rm}"
+    )
+    assert fetched.total_set_volume == 1000.0, (
+        f"Expected 1000.0, got {fetched.total_set_volume}"
+    )
 
 
 def test_fetch_lifts_virtual_columns_with_filter(tmpdir):
@@ -415,7 +417,9 @@ def test_fetch_lifts_virtual_columns_aggregation(tmpdir):
 
     # Verify each row has the expected virtual column values (LiftResult dataclass)
     for row in observed_rows:
-        assert row.estimated_1rm is not None or row.reps == 0, f"Row missing estimated_1rm: {row}"
+        assert row.estimated_1rm is not None or row.reps == 0, (
+            f"Row missing estimated_1rm: {row}"
+        )
         assert row.total_set_volume is not None, f"Row missing total_set_volume: {row}"
 
 
@@ -440,4 +444,6 @@ def test_fetch_lifts_virtual_columns_edge_case(tmpdir):
     fetched = observed_rows[0]
 
     # estimated_1rm should be None for reps=0
-    assert fetched.estimated_1rm is None, f"Expected None for reps=0, got {fetched.estimated_1rm}"
+    assert fetched.estimated_1rm is None, (
+        f"Expected None for reps=0, got {fetched.estimated_1rm}"
+    )

@@ -202,23 +202,32 @@ def add_lift_entry(db_path: Path, entry: LiftEntry | LiftResult) -> int:
         conn.close()
 
 
-def add_session_entry(db_path: Path, entries: list[LiftEntry | LiftResult]) -> int:
+def add_session_entry(db_path: Path, data: list[LiftEntry | LiftResult] | Path) -> int:
     """Insert multiple lift entries into the database.
 
     Args:
         db_path: Path to the SQLite database file.
-        entries: List of LiftEntry or LiftResult objects (already parsed from JSON at CLI layer).
+        data: Either a list of LiftEntry/LiftResult objects OR a CSV file path.
 
     Returns:
         Total number of rows affected.
 
     Raises:
-        TypeError: If entries is not a list or contains non-LiftEntry items.
-        ValueError: If database write fails.
+        TypeError: If data is not a list or Path, or contains non-LiftEntry items.
+        ValueError: If database write fails or CSV parsing fails.
     """
-    # Validate input type immediately
-    if not isinstance(entries, list):
-        raise TypeError("entries must be a list of LiftEntry objects")
+    # Handle CSV input path → parse and convert to LiftEntry list
+    if isinstance(data, Path):
+        from training_vid_organizer.db_handling.csv_parser import (
+            parse_csv_to_lift_entries,
+        )
+
+        entries = parse_csv_to_lift_entries(data)
+        return add_session_entry(db_path, entries)  # recursive call for existing logic
+
+    # Validate input type immediately (existing JSON/list behavior)
+    if not isinstance(entries := data, list):
+        raise TypeError("data must be a list of LiftEntry objects or a CSV Path")
 
     # Empty list is valid - return 0 without DB access
     if not entries:

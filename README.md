@@ -4,7 +4,7 @@ A CLI tool for organizing training videos and logging lift data with SQLite stor
 
 ## Features
 
-- Add individual lifts or bulk import sessions from JSON
+- Add individual lifts or bulk import sessions from JSON or CSV files
 - List, update, and delete logged entries
 - Filter by date, program, exercise, weight, RIR, etc.
 - Open video files to compare lift performance across various factors
@@ -55,6 +55,43 @@ tvo update 42 --weight 230
 
 # Delete an entry
 tvo delete 42 --force
+```
+
+## CSV Import Format
+
+Bulk import training sessions from a CSV file:
+
+```bash
+tvo add session -c data/sessions.csv
+```
+
+### Required Columns
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `date` | string | Date in YYYY-MM-DD format |
+| `program` | string | Program name (e.g., "Push/Pull/Legs") |
+| `program_iteration` | integer | Iteration number of the program |
+| `lift` | string | Exercise name (e.g., "squat", "bench press") |
+| `weight` | integer | Weight lifted in lbs or kg |
+| `reps` | integer | Number of repetitions |
+
+### Optional Columns
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `bodyweight` | float | Body weight at time of lift |
+| `top_set` | boolean | Mark as top set (true/false) |
+| `warm_up_set` | boolean | Mark as warm-up set (true/false) |
+| `reps_in_reserve` | integer | RIR value (e.g., 1, 2, 3) |
+| `filename` | string | Path to video file for this lift |
+
+### Example CSV
+
+```csv
+date,program,program_iteration,lift,weight,reps,bodyweight,top_set,reps_in_reserve,filename
+2026-09-30,Push/Pull/Legs,1,squat,225,8,185,true,1,/videos/squat_20260930.mp4
+2026-09-30,Push/Pull/Legs,1,bench press,135,10,185,false,2,/videos/bench_20260930.mp4
 ```
 
 ## Calculated Views

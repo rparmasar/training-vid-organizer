@@ -28,9 +28,7 @@ def get_logger(name: str = "tvo") -> logging.Logger:
 
         # Console handler for INFO and above - writes to stdout explicitly
         console_handler = logging.StreamHandler(stream=sys.stdout)
-        console_formatter = logging.Formatter(
-            "%(levelname)s - %(name)s - %(message)s"
-        )
+        console_formatter = logging.Formatter("%(levelname)s - %(name)s - %(message)s")
         console_handler.setFormatter(console_formatter)
         log.addHandler(console_handler)
 

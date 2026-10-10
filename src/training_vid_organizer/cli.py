@@ -18,6 +18,7 @@ from training_vid_organizer.db_handling.db import (
     add_session_entry,
     init_database,
 )
+from training_vid_organizer.db_handling.csv_parser import parse_csv_to_lift_entries
 from training_vid_organizer.db_handling.query import analyze_lifts, fetch_lifts
 from training_vid_organizer.db_handling.update import (
     delete_lift_entry,
@@ -169,33 +170,41 @@ def add_lift(
 
 @add_group.command("session")
 def add_session(
-    config_path: Annotated[str, Argument(help="path to json configuration file")] = "",
+    config_path: Annotated[
+        str, Argument(help="path to json or csv configuration file")
+    ] = "",
     db_path: Annotated[
         str, Option("--db-path", "-d", help="override database path")
     ] = None,
 ):
-    """add multiple lifts from a json configuration file"""
+    """add multiple lifts from a JSON or CSV configuration file"""
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
-    # load and parse JSON
-    tv_logger.debug(f"loading session data from {config_path}")
-    with open(config_path) as f:
-        session_data = json.load(f)
+    csv_path = Path(config_path)
 
-    if not isinstance(session_data, list):
-        tv_logger.error("Error: JSON root must be a list of lift entries")
-        raise typer.Exit(code=1)
+    # Auto-detect format by extension (fallback to JSON if unknown)
+    if csv_path.suffix.lower() == ".csv":
+        tv_logger.debug(f"loading session data from CSV: {config_path}")
+        entries = parse_csv_to_lift_entries(csv_path)
+    else:
+        tv_logger.debug(f"loading session data from JSON: {config_path}")
+        with open(config_path) as f:
+            session_data = json.load(f)
 
-    # convert dicts to LiftEntry objects
-    try:
-        entries = [LiftEntry(**entry_dict) for entry_dict in session_data]
-    except (TypeError, ValueError) as e:
-        tv_logger.error(f"Error parsing lift entries: {e}")
-        raise typer.Exit(code=1)
+        if not isinstance(session_data, list):
+            tv_logger.error("Error: JSON root must be a list of lift entries")
+            raise typer.Exit(code=1)
+
+        # convert dicts to LiftEntry objects
+        try:
+            entries = [LiftEntry(**entry_dict) for entry_dict in session_data]
+        except (TypeError, ValueError) as e:
+            tv_logger.error(f"Error parsing lift entries: {e}")
+            raise typer.Exit(code=1)
 
     # add via function
-    rows_updated = add_session_entry(db_path=effective_db_path, entries=entries)
+    rows_updated = add_session_entry(db_path=effective_db_path, data=entries)
 
     if rows_updated == len(entries):
         console.print(

@@ -655,9 +655,7 @@ def test_cli_list_lifts_shows_virtual_columns(runner, tmpdir):
     )
 
     # List lifts and verify virtual columns appear in output
-    result = runner.invoke(
-        app, ["list", "lifts", "--db-path", tmpdir / "test.db"]
-    )
+    result = runner.invoke(app, ["list", "lifts", "--db-path", tmpdir / "test.db"])
 
     assert result.exit_code == 0
     # Virtual columns should be present with computed values
@@ -695,9 +693,130 @@ def test_cli_list_lifts_with_virtual_columns_aggregation(runner, tmpdir):
         )
 
     # List lifts and verify multiple entries exist
-    result = runner.invoke(
-        app, ["list", "lifts", "--db-path", tmpdir / "test.db"]
-    )
+    result = runner.invoke(app, ["list", "lifts", "--db-path", tmpdir / "test.db"])
 
     assert result.exit_code == 0
     assert result.output.count("Squat") >= 3
+
+
+def test_cli_add_session_csv_works(runner, tmpdir):
+    """test that we can add a session to the db using the cli and a csv file"""
+    # init db first
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # create test CSV with required columns + optional fields
+    INPUT_CSV = """date,program,program_iteration,lift,weight,reps,bodyweight,top_set,warm_up_set,reps_in_reserve,filename
+2023-04-01,P9,1,Bicep Curl,85,4,180.0,true,false,,/path/to/video1.mp4
+2024-04-01,P9,1,Tricep Curl,85,4,,,true,,/path/to/video2.mp4
+2024-04-01,P9,1,Tricep Curl,85,4,,false,true,,/path/to/video2.mp4"""
+
+    csv_path = tmpdir / "session.csv"
+    with open(csv_path, "w") as f:
+        f.write(INPUT_CSV)
+
+    # call cli with required arguments
+    result = runner.invoke(
+        app,
+        [
+            "add",
+            "session",
+            "--db-path",
+            tmpdir / "test.db",
+            str(csv_path),
+        ],
+    )
+
+    # assert success
+    assert result.exit_code == 0
+    assert "added" in result.output.lower()
+
+
+def test_cli_add_session_csv_missing_columns(runner, tmpdir):
+    """test that CSV with missing required columns fails fast"""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # CSV missing 'weight' column
+    INPUT_CSV = """date,program,lift,reps
+2023-04-01,P9,Bicep Curl,4"""
+
+    csv_path = tmpdir / "session.csv"
+    with open(csv_path, "w") as f:
+        f.write(INPUT_CSV)
+
+    result = runner.invoke(
+        app,
+        [
+            "add",
+            "session",
+            "--db-path",
+            tmpdir / "test.db",
+            str(csv_path),
+        ],
+    )
+
+    # assert failure with clear error message
+    assert result.exit_code == 1
+    assert isinstance(result.exception, ValueError)
+    assert "missing required columns" in str(result.exception).lower()
+
+
+def test_cli_add_session_csv_invalid_data(runner, tmpdir):
+    """test that CSV with invalid data fails fast"""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # CSV with non-integer weight (invalid)
+    INPUT_CSV = """date,program,program_iteration,lift,weight,reps
+2023-04-01,P9,1,Bicep Curl,abc,4"""
+
+    csv_path = tmpdir / "session.csv"
+    with open(csv_path, "w") as f:
+        f.write(INPUT_CSV)
+
+    result = runner.invoke(
+        app,
+        [
+            "add",
+            "session",
+            "--db-path",
+            tmpdir / "test.db",
+            str(csv_path),
+        ],
+    )
+
+    # assert failure with row-specific error message
+    assert result.exit_code == 1
+    assert isinstance(result.exception, ValueError)
+    assert (
+        "row" in str(result.exception).lower()
+        and "invalid data" in str(result.exception).lower()
+    )
+
+
+def test_cli_add_session_csv_optional_fields(runner, tmpdir):
+    """test that optional CSV fields are parsed correctly"""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # CSV with all optional fields populated
+    INPUT_CSV = """date,program,program_iteration,lift,weight,reps,bodyweight,top_set,warm_up_set,reps_in_reserve,filename
+2023-04-01,P9,1,Bench Press,200,5,200,true,false,,/path/to/video.mp4"""
+
+    csv_path = tmpdir / "session.csv"
+    with open(csv_path, "w") as f:
+        f.write(INPUT_CSV)
+
+    result = runner.invoke(
+        app,
+        [
+            "add",
+            "session",
+            "--db-path",
+            tmpdir / "test.db",
+            str(csv_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    # Verify entry was added (basic check)
+    list_result = runner.invoke(app, ["list", "lifts", "--db-path", tmpdir / "test.db"])
+    assert list_result.exit_code == 0
+    assert "bench" in list_result.output.lower()

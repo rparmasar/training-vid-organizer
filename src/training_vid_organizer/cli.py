@@ -12,13 +12,13 @@ from rich.console import Console
 from rich.table import Table
 from typer import Argument, Option, Typer, confirm, echo
 
+from training_vid_organizer.db_handling.csv_parser import parse_csv_to_lift_entries
 from training_vid_organizer.db_handling.db import (
     LiftEntry,
     add_lift_entry,
     add_session_entry,
     init_database,
 )
-from training_vid_organizer.db_handling.csv_parser import parse_csv_to_lift_entries
 from training_vid_organizer.db_handling.query import analyze_lifts, fetch_lifts
 from training_vid_organizer.db_handling.update import (
     delete_lift_entry,

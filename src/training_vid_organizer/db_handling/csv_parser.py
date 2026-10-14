@@ -5,7 +5,6 @@ from pathlib import Path
 
 from training_vid_organizer.db_handling.db import LiftEntry
 
-
 REQUIRED_COLUMNS = {"date", "program", "program_iteration", "lift", "weight", "reps"}
 OPTIONAL_COLUMNS = {
     "bodyweight",

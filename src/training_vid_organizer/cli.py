@@ -709,7 +709,7 @@ def process(
     directory: Annotated[str, Argument(help="target directory to organize")] = "",
     dry_run: Annotated[
         bool, Option("--dry-run", "-n", help="preview changes without modifying files")
-    ] = True,
+    ] = False,
     force: Annotated[
         bool, Option("--force", "-f", help="skip confirmation prompt")
     ] = False,

@@ -690,17 +690,6 @@ def process(
     dry_run: Annotated[
         bool, Option("--dry-run", "-n", help="preview changes without modifying files")
     ] = False,
-    force: Annotated[
-        bool, Option("--force", "-f", help="skip confirmation prompt")
-    ] = False,
-    execute: Annotated[
-        bool,
-        Option(
-            "--execute",
-            "-e",
-            help="run normalization immediately (combines --no-dry-run + --force behavior)",
-        ),
-    ] = False,
 ):
     """Normalize video filenames in a directory by sorting NORM suffixes."""
 
@@ -743,29 +732,26 @@ def process(
     # Sort by numeric NORM value (ascending)
     sorted_files = sorted(valid_entries, key=lambda x: x[1][0])
 
-    # Dry run output or execute normalization
-    preview_done = False
-
-    # Only show preview if not in execute mode
-    if not execute:
-        console.print("Sorted order (NORM suffix):")
-        for i, (f, (_, new_name)) in enumerate(sorted_files, 1):
-            norm_val = (
-                f"{sorted_files[i - 1][1][0]:04d}"
-                if sorted_files[i - 1][1][0]
-                else "???"
-            )
-            console.print(f"  {i:3}. {f.name} → {new_name} (NORM{norm_val})")
-        preview_done = True
-
-    # Confirm before proceeding (only when not dry-run, not execute, and not force)
-    if not force and not dry_run and not execute:
-        confirm_input = typer.confirm(
-            f"\nNormalize {len(sorted_files)} file(s) in '{dir_path}'?"
+    # Print preview of sorted order
+    console.print("Sorted order (NORM suffix):")
+    for i, (f, (_, new_name)) in enumerate(sorted_files, 1):
+        norm_val = (
+            f"{sorted_files[i - 1][1][0]:04d}" if sorted_files[i - 1][1][0] else "???"
         )
-        if not confirm_input:
-            console.print("[yellow]Operation cancelled.[/yellow]")
-            return
+        console.print(f"  {i:3}. {f.name} → {new_name} (NORM{norm_val})")
+
+    # If dry-run, exit after preview
+    if dry_run:
+        console.print("[dim]Dry run complete. No files were modified.[/dim]")
+        return
+
+    # Ask for confirmation before renaming
+    confirm_input = typer.confirm(
+        f"\nNormalize {len(sorted_files)} file(s) in '{dir_path}'?"
+    )
+    if not confirm_input:
+        console.print("[yellow]Operation cancelled.[/yellow]")
+        return
 
     # Execute normalization (rename files)
     execution_failed = False
@@ -787,12 +773,9 @@ def process(
             execution_failed = True
 
     # Final status message
-    if preview_done and not execute:
-        console.print("[dim]Preview only. No files were modified.[/dim]")
-
     if execution_failed:
         console.print("\n[yellow]⚠️  Some file(s) were skipped due to errors.[/yellow]")
-    elif not dry_run and failed_count > 0:
+    elif failed_count > 0:
         console.print(
             f"\n[yellow]⚠️  {failed_count} file(s) were skipped due to errors.[/yellow]"
         )

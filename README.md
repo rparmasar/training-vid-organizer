@@ -1,9 +1,10 @@
 # Training Video Organizer
 
-A CLI tool for organizing training videos and logging lift data with SQLite storage.
+A CLI tool for organizing training videos, logging lift data, and sorting video files by NORM suffix.
 
 ## Features
 
+### Lift & Session Management
 - Add individual lifts or bulk import sessions from JSON or CSV files
 - List, update, and delete logged entries
 - Filter by date, program, exercise, weight, RIR, etc.
@@ -11,6 +12,11 @@ A CLI tool for organizing training videos and logging lift data with SQLite stor
 - Rich terminal output with tables and colors
 - Automatic calculation of estimated 1RM (Bryzycki method) and total set volume for each entry
 - Analyze progress across program iterations with built-in metrics comparison
+
+### Video File Organization
+- Process directories containing NORM-labeled video files
+- Automatically sort files by their NORM suffix in ascending order
+- Dry-run mode to preview changes before applying them
 
 ## Prerequisites
 
@@ -49,6 +55,10 @@ tvo analyze total_set_volume
 
 # Open videos for top sets
 tvo open --top-set -l 50
+
+# Process NORM video files in a directory
+tvo process /videos/NORM --dry-run          # Preview sorting without changes
+tvo process /videos/NORM                    # Apply sorting after confirmation
 
 # Update a lift entry (by ID)
 tvo update 42 --weight 230
@@ -118,10 +128,40 @@ Useful for comparing program iterations and tracking overall workload:
 tvo analyze total_set_volume
 ```
 
-## Configuration
+## Video File Processing
 
-Set environment variables to customize behavior:
+The `process` command organizes NORM-labeled video files in a directory by sorting them based on their NORM suffix. This is useful when you have multiple videos from different sessions that need to be ordered chronologically or numerically.
 
-- `TVO_DB_PATH` — Override default database location
-- `TVO_VIDEO_DIR` — Base directory for resolving relative video paths
-- `TVO_LOG_LEVEL` — Set to DEBUG or INFO for verbose output
+### How It Works
+
+1. Scans the target directory for files containing "NORM"
+2. Extracts the numeric value from each file's NORM suffix (e.g., `NORM0042` → 42)
+3. Sorts files in ascending order by this numeric value
+4. Displays a preview of the sorted order
+
+### Usage
+
+```bash
+# Preview changes without modifying files
+tvo process /videos/NORM --dry-run
+
+# Apply changes after confirming with prompt
+tvo process /videos/NORM
+```
+
+### Example Output
+
+```
+Sorted order (NORM suffix):
+   1. 229638144_NORM0012.MP4 → 229638144_NORM0012.MP4 (NORM0012)
+   2. 273678336_NORM0165.mp4 → 273678336_NORM0165.mp4 (NORM0165)
+   3. file_NORM9999.MP4 → file_NORM9999.MP4 (NORM9999)
+
+Normalize 3 file(s) in '/videos/NORM'? [y/N]: y
+```
+
+### Notes
+
+- Only files directly in the target directory are processed (no subdirectories)
+- Files must contain "NORM" and follow the expected naming convention
+- Invalid filenames are skipped with a warning message

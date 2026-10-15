@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -677,6 +678,144 @@ def analyze(
         )
 
     console.print(table)
+
+
+def get_norm_key(path: Path) -> tuple[int, str] | None:
+    """Extract numeric NORM key and proposed normalized filename.
+
+    Returns (numeric_value, new_filename) if valid, else None.
+    Example: "229638144_NORM0012.MP4" → (12, "NORM0012_229638144.MP4")
+    """
+    try:
+        parts = path.name.split("_", 1)
+        if len(parts) < 2 or "NORM" not in parts[1]:
+            return None
+
+        norm_part = parts[1].split(".")[0]
+        if not norm_part.startswith("NORM"):
+            return None
+        numeric_value = int(norm_part[4:])
+
+        # New format: NORM####_original_prefix.ext
+        new_name = f"NORM{numeric_value}_{parts[0]}" + (path.suffix or "")
+
+        return numeric_value, new_name
+    except (ValueError, IndexError):
+        return None
+
+
+@app.command("process")
+def process(
+    directory: Annotated[str, Argument(help="target directory to organize")] = "",
+    dry_run: Annotated[
+        bool, Option("--dry-run", "-n", help="preview changes without modifying files")
+    ] = True,
+    force: Annotated[
+        bool, Option("--force", "-f", help="skip confirmation prompt")
+    ] = False,
+    execute: Annotated[
+        bool,
+        Option(
+            "--execute",
+            "-e",
+            help="run normalization immediately (combines --no-dry-run + --force behavior)",
+        ),
+    ] = False,
+):
+    """Normalize video filenames in a directory by sorting NORM suffixes."""
+
+    # Validate directory argument
+    if not directory.strip():
+        console.print("[red]Error: Please provide a target directory.[/red]")
+        raise typer.Exit(code=1)
+
+    dir_path = Path(directory).resolve()
+
+    # Check read permissions and list files
+    try:
+        files = list(dir_path.iterdir())
+    except PermissionError as e:
+        tv_logger.error(f"Permission denied reading '{dir_path}': {e}")
+        console.print(f"[red]Cannot access directory: {e}[/red]")
+        raise typer.Exit(code=2)
+
+    # Filter NORM files (top-level only)
+    norm_files = [f for f in files if f.is_file() and "NORM" in f.name]
+
+    if not norm_files:
+        console.print("[red]Error: No files with 'NORM' found in directory.[/red]")
+        raise typer.Exit(code=1)
+
+    # Extract keys, filter invalid ones
+    valid_entries = []
+    failed_count = 0
+    for f in norm_files:
+        key = get_norm_key(f)
+        if key is not None:
+            valid_entries.append((f, key))
+        else:
+            failed_count += 1
+
+    if not valid_entries:
+        console.print("[dim]No files with valid NORM format found.[/dim]")
+        return
+
+    # Sort by numeric NORM value (ascending)
+    sorted_files = sorted(valid_entries, key=lambda x: x[1][0])
+
+    # Dry run output or execute normalization
+    preview_done = False
+
+    # Only show preview if not in execute mode
+    if not execute:
+        console.print("Sorted order (NORM suffix):")
+        for i, (f, (_, new_name)) in enumerate(sorted_files, 1):
+            norm_val = (
+                f"{sorted_files[i - 1][1][0]:04d}"
+                if sorted_files[i - 1][1][0]
+                else "???"
+            )
+            console.print(f"  {i:3}. {f.name} → {new_name} (NORM{norm_val})")
+        preview_done = True
+
+    # Confirm before proceeding (only when not dry-run, not execute, and not force)
+    if not force and not dry_run and not execute:
+        confirm_input = typer.confirm(
+            f"\nNormalize {len(sorted_files)} file(s) in '{dir_path}'?"
+        )
+        if not confirm_input:
+            console.print("[yellow]Operation cancelled.[/yellow]")
+            return
+
+    # Execute normalization (rename files)
+    execution_failed = False
+
+    for f, (_, new_name) in sorted_files:
+        target_path = dir_path / new_name
+
+        try:
+            os.rename(str(f), str(target_path))
+        except PermissionError as e:
+            sys.stderr.write(f"  ⚠️  Skipping '{f.name}': permission denied - {e}\n")
+            execution_failed = True
+        except OSError as e:
+            # Handle cases where target exists or source was already moved
+            if "No such file or directory" in str(e):
+                sys.stderr.write(f"  ⚠️  Skipping '{f.name}': file no longer exists\n")
+            else:
+                sys.stderr.write(f"  ⚠️  Skipping '{f.name}': {e}\n")
+            execution_failed = True
+
+    # Final status message
+    if preview_done and not execute:
+        console.print("[dim]Preview only. No files were modified.[/dim]")
+
+    if execution_failed:
+        console.print("\n[yellow]⚠️  Some file(s) were skipped due to errors.[/yellow]")
+    elif not dry_run and failed_count > 0:
+        console.print(
+            f"\n[yellow]⚠️  {failed_count} file(s) were skipped due to errors.[/yellow]"
+        )
 
 
 if __name__ == "__main__":

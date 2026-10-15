@@ -178,6 +178,7 @@ See [README.md](../README.md) for logging level environment variable configurati
 ```python
 from typer import echo, confirm
 
+
 @app.command()
 def export(format: str = "json"):
     """Export all entries to file."""

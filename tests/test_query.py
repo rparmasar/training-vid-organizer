@@ -209,7 +209,7 @@ def test_fetch_lifts_works_no_filters(tmpdir):
     sample_lift_entry = LiftEntry(
         date="2025-01-01",
         program="Test Program",
-        program_iteration=1,
+        program_iteration="1",
         lift="Bicep Curl",
         weight=100,
         reps=2,
@@ -246,7 +246,7 @@ def test_fetch_lifts_works_with_filter(tmpdir):
     sample_lift_entry = LiftEntry(
         date="2025-01-01",
         program="Test Program",
-        program_iteration=1,
+        program_iteration="1",
         lift="Bicep Curl",
         weight=100,
         reps=2,

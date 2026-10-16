@@ -12,7 +12,7 @@ class LiftEntry:
 
     date: str
     program: str
-    program_iteration: int
+    program_iteration: str
     lift: str
     weight: int
     reps: int

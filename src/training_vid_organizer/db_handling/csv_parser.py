@@ -36,7 +36,7 @@ def parse_csv_to_lift_entries(csv_path: Path) -> list[LiftEntry]:
                 entry = LiftEntry(
                     date=str(row["date"]),
                     program=str(row["program"]),
-                    program_iteration=int(row["program_iteration"]),
+                    program_iteration=str(row["program_iteration"]),
                     lift=str(row["lift"]),
                     weight=int(row["weight"]),
                     reps=int(row["reps"]),

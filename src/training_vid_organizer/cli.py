@@ -546,6 +546,11 @@ def open_files(
     # Fetch data
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
     entries = fetch_lifts(db_path=effective_db_path, filters=filters, limit=limit)
+    entries_w_filenames = [entry for entry in entries if entry.filename is not None]
+
+    tv_logger.info(
+        f"Showing {len(entries_w_filenames)} entries that have filenames from a total of {len(entries)}."
+    )
 
     if not entries:
         console.print("[dim]No lifts found matching the specified criteria.[/dim]")
@@ -560,6 +565,7 @@ def open_files(
         ("lift", "dim", None),
         ("weight", None, "right"),
         ("reps", None, "right"),
+        ("bodyweight", None, "right"),
         ("type_label", "dim", None),
         ("filename", None, None),
     ]
@@ -572,12 +578,13 @@ def open_files(
             "lift": "lift",
             "weight": "weight (lbs)",
             "reps": "reps",
+            "bodyweight": "bw (lbs)",
             "type_label": "type",
             "filename": "file",
         }[name]
         table.add_column(label, style=style, justify=justify)
 
-    for entry in entries:
+    for entry in entries_w_filenames:
         type_labels = (
             ["top"]
             if entry.top_set
@@ -592,6 +599,7 @@ def open_files(
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
+            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
             type_label,
             str(entry.filename) if entry.filename else "-",
         )

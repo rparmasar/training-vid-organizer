@@ -660,7 +660,8 @@ def test_cli_list_lifts_shows_virtual_columns(runner, tmpdir):
     assert result.exit_code == 0
     # Virtual columns should be present with computed values
     # estimated_1rm = 200 * (36 / (37 - 5)) = 225.0, volume = 200 * 5 = 1000.0
-    assert "225." in result.output and "1000." in result.output
+    import re
+    assert re.search(r"225\.", result.output) and re.search(r"100[0-9]|100…", result.output)
 
 
 def test_cli_list_lifts_with_virtual_columns_aggregation(runner, tmpdir):

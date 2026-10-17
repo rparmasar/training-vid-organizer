@@ -68,7 +68,7 @@ def fetch_lifts(
                     pass  # Keep as string if conversion fails
 
             # Ensure integer fields are ints (SQLite returns floats for REAL type)
-            int_fields = ["program_iteration", "weight", "reps"]
+            int_fields = ["weight", "reps"]
             for field in int_fields:
                 if (
                     isinstance(entry_dict.get(field), float)

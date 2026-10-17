@@ -262,7 +262,7 @@ def list_lifts(
     if program is not None:
         filters["program"] = str(program)
     if iteration is not None:
-        filters["program_iteration"] = int(iteration)
+        filters["program_iteration"] = str(iteration)
     if lift is not None:
         filters["lift"] = str(lift)
     if weight is not None:
@@ -351,16 +351,10 @@ def list_lifts(
             else "-"
         )
 
-        # Safely convert program_iteration (may contain non-numeric suffixes like "cp-10")
-        iter_val = (
-            entry.program_iteration.strip().split("-")[0]
-            if entry.program_iteration
-            else "-"
-        )
         table.add_row(
             str(entry.date),
             str(entry.program),
-            f"{int(iter_val)}" if iter_val.isdigit() else str(entry.program_iteration),
+            str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
@@ -397,16 +391,10 @@ def list_lifts(
             else "-"
         )
 
-        # Safely convert program_iteration (may contain non-numeric suffixes like "cp-10")
-        iter_val = (
-            entry.program_iteration.strip().split("-")[0]
-            if entry.program_iteration
-            else "-"
-        )
         table.add_row(
             str(entry.date),
             str(entry.program),
-            f"{int(iter_val)}" if iter_val.isdigit() else str(entry.program_iteration),
+            str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
@@ -469,7 +457,7 @@ def update(
     if program is not None:
         update_kwargs["program"] = str(program)
     if program_iteration is not None:
-        update_kwargs["program_iteration"] = int(program_iteration)
+        update_kwargs["program_iteration"] = str(program_iteration)
     if lift is not None:
         update_kwargs["lift"] = str(lift)
     if weight is not None:
@@ -584,7 +572,7 @@ def open_files(
     if program is not None:
         filters["program"] = str(program)
     if iteration is not None:
-        filters["program_iteration"] = int(iteration)
+        filters["program_iteration"] = str(iteration)
     if lift is not None:
         filters["lift"] = str(lift)
     if weight is not None:
@@ -636,16 +624,10 @@ def open_files(
         )
         type_label = ", ".join(type_labels) if type_labels else "-"
 
-        # Safely convert program_iteration (may contain non-numeric suffixes like "cp-10")
-        iter_val = (
-            entry.program_iteration.strip().split("-")[0]
-            if entry.program_iteration
-            else "-"
-        )
         table.add_row(
             str(entry.date),
             str(entry.program),
-            f"{int(iter_val)}" if iter_val.isdigit() else str(entry.program_iteration),
+            str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
@@ -655,7 +637,6 @@ def open_files(
 
     console.print(table)
 
-    # Open files sequentially with VLC (deduplicate and sort)
     _, video_dir = get_config_paths(
         default_db_path=DB_DEFAULT
         if effective_db_path is None
@@ -708,9 +689,6 @@ def analyze(
     console.print(table)
 
 
-# get_norm_key is now imported from training_vid_organizer.utils
-
-
 @app.command("process")
 def process(
     directory: Annotated[str, Argument(help="target directory to organize")] = "",
@@ -718,7 +696,10 @@ def process(
         bool, Option("--dry-run", "-n", help="preview changes without modifying files")
     ] = False,
 ):
-    """Normalize video filenames in a directory by sorting NORM suffixes."""
+    """
+    normalize video filenames in a directory by sorting NORM suffixes.
+    **note**: this exists to handle files created before 2026 as the naming format seems to have changed
+    """
 
     # Validate directory argument
     if not directory.strip():

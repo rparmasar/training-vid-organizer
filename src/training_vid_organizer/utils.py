@@ -93,8 +93,10 @@ def open_video_file(filename: str | None, base_dir: Path) -> bool:
 def open_vlc_sequential(filepaths: list[str], base_dir: Path) -> None:
     """Open multiple video files sequentially in a single VLC instance.
 
-    Files are opened one after another (tabs), without autoplay between them.
-    This provides a smoother viewing experience than opening each file separately.
+    Files are opened one after another as tabs, allowing comparison of lift
+    performance across different sessions or angles without closing and reopening.
+    The first file starts playing; subsequent files open as new tabs when the
+    current one is closed or finished.
 
     Args:
         filepaths: List of absolute file paths to open.

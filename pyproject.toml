@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "typer>=0.15.0",
+    "vlc>=3.0.0.post0",
 ]
 
 [project.optional-dependencies]

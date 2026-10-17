@@ -13,15 +13,35 @@ A CLI tool for organizing training videos, logging lift data, and sorting video 
 - Automatic calculation of estimated 1RM (Bryzycki method) and total set volume for each entry
 - Analyze progress across program iterations with built-in metrics comparison
 
-### Video File Organization
+### Video File Organization & Playback
 - Process directories containing NORM-labeled video files
 - Automatically sort files by their NORM suffix in ascending order
+- Open filtered videos sequentially using VLC for side-by-side comparison
 - Dry-run mode to preview changes before applying them
 
 ## Prerequisites
 
 - Python 3.10+
 - `uv` (recommended for dependency management)
+- VLC media player (for video playback feature; optional but recommended)
+
+### Installing VLC
+
+**Linux:**
+```bash
+sudo apt install vlc        # Debian/Ubuntu
+sudo dnf install vlc        # Fedora/RHEL
+sudo pacman -S vlc          # Arch Linux
+```
+
+**macOS:**
+Download from [VLC official site](https://www.videolan.org/vlc/) or use Homebrew:
+```bash
+brew install vlc
+```
+
+**Windows:**
+Download installer from [VLC official site](https://www.videolan.org/vlc/).
 
 ## Installation
 
@@ -53,7 +73,7 @@ tvo analyze estimated_1rm
 # Analyze total set volume progression
 tvo analyze total_set_volume
 
-# Open videos for top sets
+# Open videos for top sets (sequentially with VLC)
 tvo open --top-set -l 50
 
 # Process NORM video files in a directory

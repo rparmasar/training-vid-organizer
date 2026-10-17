@@ -51,8 +51,8 @@ app = Typer(
     add_completion=False,
 )
 # wire up subcommands
-add_group = Typer(name="add", help="Add training data")
-list_group = Typer(name="list", help="List training data")
+add_group = Typer(name="add", help="add training data")
+list_group = Typer(name="list", help="list training data")
 app.add_typer(add_group)
 app.add_typer(list_group)
 
@@ -302,6 +302,7 @@ def list_lifts(
 
     # Define table columns explicitly (matching row data order)
     col_defs = [
+        ("id", "dim", "right", 5),
         ("date", "dim", None, None),
         ("program", "dim", None, None),
         ("program_iteration", "dim", None, None),
@@ -317,6 +318,7 @@ def list_lifts(
 
     for name, style, justify, width in col_defs:
         label = {
+            "id": "#",
             "date": "date",
             "program": "program",
             "program_iteration": "iteration",
@@ -352,62 +354,21 @@ def list_lifts(
         )
 
         table.add_row(
-            str(entry.date),
-            str(entry.program),
-            str(entry.program_iteration),
-            str(entry.lift),
-            f"{entry.weight:.1f}",
-            f"{int(entry.reps)}",
-            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
-            type_label,
-            filepath_str,
-            est_1rm_str,
-            volume_str,
-        )
-
-    # Add ID column header after the table is built
-    table.add_column("id", style="dim", justify="right")
-
-    # Rebuild rows with ID column included
-    table.rows.clear()
-
-    for entry in entries:
-        type_labels = []
-        if entry.top_set:
-            type_labels.append("top")
-        if entry.warm_up_set:
-            type_labels.append("warm-up")
-        type_label = ", ".join(type_labels) if type_labels else "-"
-
-        filepath_str = str(entry.filename) if entry.filename else "-"
-
-        # Format virtual columns - handle None values gracefully
-        est_1rm_str = (
-            f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
-        )
-        volume_str = (
-            f"{entry.total_set_volume:.2f}"
-            if entry.total_set_volume is not None
-            else "-"
-        )
-
-        table.add_row(
-            str(entry.date),
-            str(entry.program),
-            str(entry.program_iteration),
-            str(entry.lift),
-            f"{entry.weight:.1f}",
-            f"{int(entry.reps)}",
-            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
-            type_label,
-            filepath_str,
-            est_1rm_str,
-            volume_str,
             str(entry.entry_id) if entry.entry_id else "-",
+            str(entry.date),
+            str(entry.program),
+            str(entry.program_iteration),
+            str(entry.lift),
+            f"{entry.weight:.1f}",
+            f"{int(entry.reps)}",
+            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
+            type_label,
+            filepath_str,
+            est_1rm_str,
+            volume_str,
         )
 
     console.print(table)
-    tv_logger.info(f"listed {len(entries)} lift(s)")
 
 
 @app.command("update")
@@ -660,7 +621,7 @@ def analyze(
         str | None, Option("--db-path", "-d", help="override database path")
     ] = None,
 ):
-    """Run comparison analysis across program iterations."""
+    """run comparison analysis across program iterations."""
 
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 

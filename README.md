@@ -150,6 +150,8 @@ tvo analyze total_set_volume
 
 ## Video File Processing
 
+> **note:** this mainly exists because prior to 2026, the xtu go cam saved files in a format that was hard to sort from a file explorer-like gui.
+
 The `process` command organizes NORM-labeled video files in a directory by sorting them based on their NORM suffix. This is useful when you have multiple videos from different sessions that need to be ordered chronologically or numerically.
 
 ### How It Works

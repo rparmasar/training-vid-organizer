@@ -205,7 +205,7 @@ def analyze_lifts(
         FROM lifts
         WHERE {col} IS NOT NULL
         GROUP BY program_iteration, lift
-        ORDER BY program_iteration DESC
+        ORDER BY date DESC
     """
 
     conn = sqlite3.connect(db_path)
@@ -225,7 +225,7 @@ def analyze_lifts(
             entry_dict = dict(zip(columns, row))
             results.append(
                 (
-                    int(entry_dict["program_iteration"]),
+                    str(entry_dict["program_iteration"]),
                     str(entry_dict["lift"]),
                     float(entry_dict[alias]) if entry_dict[alias] else None,
                     float(entry_dict["avg_bodyweight"])

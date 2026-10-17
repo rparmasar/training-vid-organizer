@@ -29,8 +29,7 @@ from training_vid_organizer.logging_config import logger as tv_logger
 from training_vid_organizer.utils import (
     get_config_paths,
     get_norm_key,
-    get_video_base_dir,
-    open_video_file,
+    open_vlc_sequential,
 )
 
 # Set log level from environment variable if set
@@ -352,10 +351,16 @@ def list_lifts(
             else "-"
         )
 
+        # Safely convert program_iteration (may contain non-numeric suffixes like "cp-10")
+        iter_val = (
+            entry.program_iteration.strip().split("-")[0]
+            if entry.program_iteration
+            else "-"
+        )
         table.add_row(
             str(entry.date),
             str(entry.program),
-            f"{int(entry.program_iteration)}",
+            f"{int(iter_val)}" if iter_val.isdigit() else str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
@@ -392,10 +397,16 @@ def list_lifts(
             else "-"
         )
 
+        # Safely convert program_iteration (may contain non-numeric suffixes like "cp-10")
+        iter_val = (
+            entry.program_iteration.strip().split("-")[0]
+            if entry.program_iteration
+            else "-"
+        )
         table.add_row(
             str(entry.date),
             str(entry.program),
-            f"{int(entry.program_iteration)}",
+            f"{int(iter_val)}" if iter_val.isdigit() else str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
@@ -554,6 +565,9 @@ def open_files(
     warm_up_set: Annotated[
         bool | None, Option("--warm-up-set", "-w", help="filter for warmup sets only")
     ] = None,
+    earliest: Annotated[
+        bool | None, Option("--earliest", "-e", help="show earliest videos first")
+    ] = None,
     limit: Annotated[
         int, Option("--limit", "-l", help="maximum number of results to show")
     ] = 50,
@@ -591,14 +605,14 @@ def open_files(
     # Show results table (same style as list_lifts)
     table = Table(box=None, show_header=True, header_style="dim", expand=False)
     col_defs = [
-        ("date", "dim"),
-        ("program", "dim"),
-        ("program_iteration", "dim"),
-        ("lift", "dim"),
+        ("date", "dim", None),
+        ("program", "dim", None),
+        ("program_iteration", "dim", None),
+        ("lift", "dim", None),
         ("weight", None, "right"),
         ("reps", None, "right"),
-        ("type_label", "dim"),
-        ("filename", None),
+        ("type_label", "dim", None),
+        ("filename", None, None),
     ]
 
     for name, style, justify in col_defs:
@@ -622,10 +636,16 @@ def open_files(
         )
         type_label = ", ".join(type_labels) if type_labels else "-"
 
+        # Safely convert program_iteration (may contain non-numeric suffixes like "cp-10")
+        iter_val = (
+            entry.program_iteration.strip().split("-")[0]
+            if entry.program_iteration
+            else "-"
+        )
         table.add_row(
             str(entry.date),
             str(entry.program),
-            f"{int(entry.program_iteration)}",
+            f"{int(iter_val)}" if iter_val.isdigit() else str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
@@ -635,12 +655,19 @@ def open_files(
 
     console.print(table)
 
-    # Open files (deduplicate with set)
-    base_dir = get_video_base_dir()
-    unique_files = sorted(set(str(e.filename) for e in entries if e.filename))
-
-    for filepath in unique_files:
-        open_video_file(filepath, base_dir)
+    # Open files sequentially with VLC (deduplicate and sort)
+    _, video_dir = get_config_paths(
+        default_db_path=DB_DEFAULT
+        if effective_db_path is None
+        else Path(effective_db_path)
+    )
+    if video_dir:
+        unique_files = (
+            ([str(e.filename) for e in entries if e.filename])
+            if not earliest
+            else ([str(e.filename) for e in reversed(entries) if e.filename])
+        )
+        open_vlc_sequential(unique_files, Path(video_dir))
 
 
 @app.command("analyze")

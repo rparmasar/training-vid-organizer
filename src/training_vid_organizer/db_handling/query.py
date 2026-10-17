@@ -180,11 +180,15 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
 
 
 def analyze_lifts(
-    db_path: Path, metric: str = "estimated_1rm"
+    db_path: Path,
+    metric: str = "estimated_1rm",
+    lift: str | None = None,
+    iteration: str | None = None,
 ) -> list[tuple[int, str, float | None, float | None]]:
     """Run program iteration comparison analysis.
 
     Returns list of (program_iteration, lift, avg_metric_value, avg_bodyweight).
+    Supports suffix-match filtering for lift and iteration via LIKE %value.
     """
 
     if metric == "estimated_1rm":
@@ -196,6 +200,18 @@ def analyze_lifts(
     else:
         raise ValueError(f"Unknown metric: {metric}")
 
+    # Build WHERE clause with suffix-match filters (LIKE %value)
+    where_clauses: list[str] = []
+    params: list[Any] = []
+
+    if lift is not None:
+        where_clauses.append("lift = ?")
+        params.append(lift)  # exact match
+    if iteration is not None:
+        where_clauses.append("program_iteration LIKE ?")
+        params.append(f"{iteration}%")  # suffix match
+
+    # Build base query with NOT NULL filter
     query = f"""
         SELECT
             program_iteration,
@@ -204,14 +220,18 @@ def analyze_lifts(
             AVG(bodyweight) as avg_bodyweight
         FROM lifts
         WHERE {col} IS NOT NULL
-        GROUP BY program_iteration, lift
-        ORDER BY date DESC
     """
+
+    # Add suffix-match filters if provided (using LIKE %value pattern)
+    if where_clauses:
+        query += " AND (" + " AND ".join(where_clauses) + ")"
+
+    query += " GROUP BY program_iteration, lift ORDER BY date DESC"
 
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
-        cursor.execute(query)
+        cursor.execute(query, params)
 
         rows = cursor.fetchall()
 

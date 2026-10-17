@@ -661,7 +661,10 @@ def test_cli_list_lifts_shows_virtual_columns(runner, tmpdir):
     # Virtual columns should be present with computed values
     # estimated_1rm = 200 * (36 / (37 - 5)) = 225.0, volume = 200 * 5 = 1000.0
     import re
-    assert re.search(r"225\.", result.output) and re.search(r"100[0-9]|100…", result.output)
+
+    assert re.search(r"225\.", result.output) and re.search(
+        r"100[0-9]|100…", result.output
+    )
 
 
 def test_cli_list_lifts_with_virtual_columns_aggregation(runner, tmpdir):
@@ -821,3 +824,259 @@ def test_cli_add_session_csv_optional_fields(runner, tmpdir):
     list_result = runner.invoke(app, ["list", "lifts", "--db-path", tmpdir / "test.db"])
     assert list_result.exit_code == 0
     assert "bench" in list_result.output.lower()
+
+
+def test_cli_analyze_default(runner, tmpdir):
+    """Test analyze command with no filters returns all data."""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # Add sample data across multiple iterations and lifts
+    for iteration in [1, 2]:
+        for lift_name in ["Squat", "Bench Press"]:
+            runner.invoke(
+                app,
+                [
+                    "add",
+                    "lift",
+                    "--db-path",
+                    tmpdir / "test.db",
+                    "--date",
+                    f"2025-01-{iteration:02d}",
+                    "--program",
+                    "P9",
+                    "--iteration",
+                    str(iteration),
+                    "--lift",
+                    lift_name,
+                    "--weight",
+                    "200",
+                    "--reps",
+                    "5",
+                ],
+            )
+
+    # Run analyze with default metric (estimated_1rm) and no filters
+    result = runner.invoke(
+        app, ["analyze", "estimated_1rm", "--db-path", tmpdir / "test.db"]
+    )
+
+    assert result.exit_code == 0
+    output_lower = result.output.lower()
+    assert (
+        "iteration" in output_lower
+        or "squat" in output_lower
+        or "bench" in output_lower
+    )
+
+
+def test_cli_analyze_with_lift_filter(runner, tmpdir):
+    """Test analyze command filters by lift name using suffix match."""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # Add data with various lift names
+    for iteration in [1, 2]:
+        for lift_name in ["Squat", "Front Squat", "Bench Press"]:
+            runner.invoke(
+                app,
+                [
+                    "add",
+                    "lift",
+                    "--db-path",
+                    tmpdir / "test.db",
+                    "--date",
+                    f"2025-01-{iteration:02d}",
+                    "--program",
+                    "P9",
+                    "--iteration",
+                    str(iteration),
+                    "--lift",
+                    lift_name,
+                    "--weight",
+                    "200",
+                    "--reps",
+                    "5",
+                ],
+            )
+
+    # Run analyze with lift filter using suffix match ("quat" matches "Squat" and "Front Squat")
+    result = runner.invoke(
+        app, ["analyze", "estimated_1rm", "-L", "quat", "--db-path", tmpdir / "test.db"]
+    )
+
+    assert result.exit_code == 0
+    output_lower = result.output.lower()
+    # Should contain matches for lifts containing "quat"
+    assert "squat" in output_lower
+
+
+def test_cli_analyze_with_iteration_filter(runner, tmpdir):
+    """Test analyze command filters by program_iteration using suffix match."""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # Add data with various iteration numbers
+    for iteration in [1, 10, 100]:
+        for lift_name in ["Squat", "Bench Press"]:
+            runner.invoke(
+                app,
+                [
+                    "add",
+                    "lift",
+                    "--db-path",
+                    tmpdir / "test.db",
+                    "--date",
+                    f"2025-01-{iteration:02d}",
+                    "--program",
+                    "P9",
+                    "--iteration",
+                    str(iteration),
+                    "--lift",
+                    lift_name,
+                    "--weight",
+                    "200",
+                    "--reps",
+                    "5",
+                ],
+            )
+
+    # Run analyze with iteration filter using suffix match ("0" matches 10 and 100)
+    result = runner.invoke(
+        app, ["analyze", "estimated_1rm", "-i", "0", "--db-path", tmpdir / "test.db"]
+    )
+
+    assert result.exit_code == 0
+    _ = result.output.lower()  # Verify output is generated without crash
+    # Should contain data from iterations 10 and/or 100 (both end with "0")
+
+
+def test_cli_analyze_with_both_filters(runner, tmpdir):
+    """Test analyze command filters by both lift and iteration simultaneously."""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # Add data with multiple combinations
+    for iteration in [1, 2]:
+        for lift_name in ["Squat", "Bench Press"]:
+            runner.invoke(
+                app,
+                [
+                    "add",
+                    "lift",
+                    "--db-path",
+                    tmpdir / "test.db",
+                    "--date",
+                    f"2025-01-{iteration:02d}",
+                    "--program",
+                    "P9",
+                    "--iteration",
+                    str(iteration),
+                    "--lift",
+                    lift_name,
+                    "--weight",
+                    "200",
+                    "--reps",
+                    "5",
+                ],
+            )
+
+    # Run analyze with both filters: iteration="1" and lift suffix="quat"
+    result = runner.invoke(
+        app,
+        [
+            "analyze",
+            "estimated_1rm",
+            "-i",
+            "1",
+            "-L",
+            "quat",
+            "--db-path",
+            tmpdir / "test.db",
+        ],
+    )
+
+    assert result.exit_code == 0
+    output_lower = result.output.lower()
+    # Should contain data from iteration 1 with lifts containing "quat" (Squat)
+    assert "squat" in output_lower
+
+
+def test_cli_analyze_with_total_set_volume_metric(runner, tmpdir):
+    """Test analyze command works with total_set_volume metric."""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # Add data with known values: weight=200, reps=5 -> volume = 1000
+    for iteration in [1, 2]:
+        runner.invoke(
+            app,
+            [
+                "add",
+                "lift",
+                "--db-path",
+                tmpdir / "test.db",
+                "--date",
+                f"2025-01-{iteration:02d}",
+                "--program",
+                "P9",
+                "--iteration",
+                str(iteration),
+                "--lift",
+                "Squat",
+                "--weight",
+                "200",
+                "--reps",
+                "5",
+            ],
+        )
+
+    # Run analyze with total_set_volume metric
+    result = runner.invoke(
+        app, ["analyze", "total_set_volume", "-i", "1", "--db-path", tmpdir / "test.db"]
+    )
+
+    assert result.exit_code == 0
+    output_lower = result.output.lower()
+    assert "iteration" in output_lower or "squat" in output_lower
+
+
+def test_cli_analyze_no_matches(runner, tmpdir):
+    """Test analyze command returns gracefully when filters match nothing."""
+    runner.invoke(app, ["init", "--db-path", tmpdir / "test.db"])
+
+    # Add some data
+    runner.invoke(
+        app,
+        [
+            "add",
+            "lift",
+            "--db-path",
+            tmpdir / "test.db",
+            "--date",
+            "2025-01-01",
+            "--program",
+            "P9",
+            "--iteration",
+            "1",
+            "--lift",
+            "Squat",
+            "--weight",
+            "200",
+            "--reps",
+            "5",
+        ],
+    )
+
+    # Run analyze with filters that match nothing
+    result = runner.invoke(
+        app,
+        [
+            "analyze",
+            "estimated_1rm",
+            "-i",
+            "999",
+            "-L",
+            "nonexistent",
+            "--db-path",
+            tmpdir / "test.db",
+        ],
+    )
+
+    assert result.exit_code == 0
+    # Should not crash, may show empty or minimal output

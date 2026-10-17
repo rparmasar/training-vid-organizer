@@ -1,6 +1,6 @@
 # Training Video Organizer
 
-A CLI tool for organizing training videos, logging lift data, and sorting video files by NORM suffix.
+A CLI tool for organizing training videos, logging lift data, and sorting video files from the XTU S6 action camera.
 
 ## Features
 

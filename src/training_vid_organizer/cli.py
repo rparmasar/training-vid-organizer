@@ -625,6 +625,14 @@ def analyze(
     metric: Annotated[
         str, Argument(help="metric to analyze (estimated_1rm | total_set_volume)")
     ] = "",
+    lift: Annotated[
+        str | None,
+        Option("--lift", "-L", help="filter by exercise name (suffix match)"),
+    ] = None,
+    iteration: Annotated[
+        str | None,
+        Option("--iteration", "-i", help="filter by program iteration (suffix match)"),
+    ] = None,
     db_path: Annotated[
         str | None, Option("--db-path", "-d", help="override database path")
     ] = None,
@@ -633,8 +641,15 @@ def analyze(
 
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
+    # Build filters dict for helper function
+    filters: dict[str, str | int | float] = {}
+    if lift is not None:
+        filters["lift"] = str(lift)
+    if iteration is not None:
+        filters["iteration"] = str(iteration)
+
     # Call pure helper function (handles connection internally)
-    results = analyze_lifts(effective_db_path, metric)
+    results = analyze_lifts(effective_db_path, metric, **filters)
 
     if not results:
         console.print("[dim]No data found for analysis.[/dim]")

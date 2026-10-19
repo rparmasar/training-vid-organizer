@@ -50,11 +50,28 @@ Download installer from [VLC official site](https://www.videolan.org/vlc/).
 uv sync
 ```
 
+### Environment Variables
+
+Set `TVO_VIDEO_DIR` to point to your video storage directory:
+
+**Linux/macOS:**
+```bash
+export TVO_VIDEO_DIR="/videos"
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:TVO_VIDEO_DIR="C:\Videos"
+```
+
+This environment variable is used by the `process` command to locate and organize your NORM-labeled video files.
+
 ## Quick Start
 
 ```bash
 # Initialize the database
-tvo init -d db/training.db
+tvo init
+
 
 # Add a single lift with video
 tvo add lift --date 2026-09-30 --program "Push/Pull/Legs" \

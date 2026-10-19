@@ -499,8 +499,8 @@ def test_analyze_lifts_no_filters(tmpdir):
     assert lifts == {"Squat", "Bench Press"}
 
 
-def test_analyze_lifts_with_lift_filter(tmpdir):
-    """Test analyze_lifts filters by lift name using suffix match."""
+def test_analyze_lifts_with_exact_lift_match(tmpdir):
+    """Test analyze_lifts filters by lift name using exact match."""
     init_database(tmpdir / "test.db")
 
     # Add data with various lift names
@@ -533,26 +533,24 @@ def test_analyze_lifts_with_lift_filter(tmpdir):
     for entry in entries:
         add_lift_entry(tmpdir / "test.db", entry)
 
-    # Filter by "quat" suffix match (matches all three lifts containing "quat")
-    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", lift="quat")
+    # Filter by exact match "Squat" (should only match Squat, not Front Squat)
+    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", lift="Squat")
 
-    assert (
-        len(results) == 3
-    )  # Three unique combinations: Squat(iter2), Front Squat(iter1), Squat(iter1)
+    assert len(results) == 2  # Two unique combinations: Squat(iter2), Squat(iter1)
     for iteration, lift, _, _ in results:
-        assert "quat" in lift.lower()
+        assert lift == "Squat"
 
 
-def test_analyze_lifts_with_iteration_filter(tmpdir):
-    """Test analyze_lifts filters by program_iteration using suffix match."""
+def test_analyze_lifts_with_iteration_filter_exact_match(tmpdir):
+    """Test analyze_lifts filters by program_iteration using exact match."""
     init_database(tmpdir / "test.db")
 
-    # Add data with various iteration numbers
+    # Add data with various iteration numbers as strings (stored as strings in DB)
     entries = [
         LiftEntry(
             date="2025-01-01",
             program="P9",
-            program_iteration=1,
+            program_iteration="1",
             lift="Squat",
             weight=200,
             reps=5,
@@ -560,7 +558,7 @@ def test_analyze_lifts_with_iteration_filter(tmpdir):
         LiftEntry(
             date="2025-01-02",
             program="P9",
-            program_iteration=10,
+            program_iteration="10",
             lift="Bench Press",
             weight=180,
             reps=6,
@@ -568,7 +566,7 @@ def test_analyze_lifts_with_iteration_filter(tmpdir):
         LiftEntry(
             date="2025-01-03",
             program="P9",
-            program_iteration=100,
+            program_iteration="100",
             lift="Squat",
             weight=210,
             reps=5,
@@ -577,12 +575,12 @@ def test_analyze_lifts_with_iteration_filter(tmpdir):
     for entry in entries:
         add_lift_entry(tmpdir / "test.db", entry)
 
-    # Filter by "0" suffix match (should match iterations 10 and 100)
-    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", iteration="0")
+    # Filter by exact match "10" (should only match iteration 10)
+    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", iteration="10")
 
-    assert len(results) == 2  # Two unique combinations with matching iterations
+    assert len(results) == 1  # One unique combination with matching iteration
     for iteration, lift, _, _ in results:
-        assert int(iteration) >= 10
+        assert iteration == "10" and lift == "Bench Press"
 
 
 def test_analyze_lifts_with_both_filters(tmpdir):
@@ -619,14 +617,14 @@ def test_analyze_lifts_with_both_filters(tmpdir):
     for entry in entries:
         add_lift_entry(tmpdir / "test.db", entry)
 
-    # Filter by both iteration "1" and lift containing "quat"
+    # Filter by exact match iteration "1" and lift containing "quat" (suffix match)
     results = analyze_lifts(
-        tmpdir / "test.db", metric="estimated_1rm", iteration="1", lift="quat"
+        tmpdir / "test.db", metric="estimated_1rm", iteration="1", lift="Squat"
     )
 
     assert len(results) == 1  # Only one matching combination: (iteration=1, lift=Squat)
     assert results[0][0] == "1"
-    assert "quat" in results[0][1].lower()
+    assert results[0][1] == "Squat"
 
 
 def test_analyze_lifts_with_no_matches(tmpdir):
@@ -710,14 +708,110 @@ def test_analyze_lifts_with_filter_and_total_volume(tmpdir):
     for entry in entries:
         add_lift_entry(tmpdir / "test.db", entry)
 
-    # Filter by iteration and lift suffix match with total_set_volume metric
+    # Filter by exact match iteration and lift with total_set_volume metric
     results = analyze_lifts(
         tmpdir / "test.db",
         metric="total_set_volume",
         iteration="1",
-        lift="quat",
+        lift="Squat",
     )
 
     assert (
         len(results) == 1
-    )  # Only Squat(iteration=1) matches (Bench Press doesn't contain 'quat')
+    )  # Only Squat(iteration=1) matches
+
+
+def test_analyze_lifts_both_metrics_mode(tmpdir):
+    """Test analyze_lifts returns both metrics when no metric is specified."""
+    init_database(tmpdir / "test.db")
+
+    # Add data with known values: weight=200, reps=5 -> volume = 1000
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+            bodyweight=200.0,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+            bodyweight=180.0,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Call with no metric specified (None) - should return both metrics
+    results = analyze_lifts(tmpdir / "test.db")
+
+    assert len(results) == 2  # Two unique combinations
+    for iteration, lift, avg_metric, bodyweight in results:
+        assert iteration in ("1",)
+        assert lift in ("Squat", "Bench Press")
+        # estimated_1rm should be calculated (not None)
+        assert avg_metric is not None
+        # bodyweight should be approximately 200 or 180
+        if lift == "Squat":
+            assert abs(bodyweight - 200.0) < 1.0
+        else:
+            assert abs(bodyweight - 180.0) < 1.0
+
+
+def test_analyze_lifts_both_metrics_with_filters(tmpdir):
+    """Test analyze_lifts returns both metrics with filters applied."""
+    init_database(tmpdir / "test.db")
+
+    # Add data across iterations and lifts
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+            bodyweight=200.0,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+            bodyweight=180.0,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="P9",
+            program_iteration=2,
+            lift="Squat",
+            weight=210,
+            reps=5,
+            bodyweight=210.0,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Filter by exact match iteration and lift with both metrics mode
+    results = analyze_lifts(
+        tmpdir / "test.db",
+        iteration="1",
+        lift="Squat",
+    )
+
+    assert len(results) == 1  # Only Squat(iteration=1) matches
+    iteration, lift, avg_metric, bodyweight = results[0]
+    assert iteration == "1"
+    assert lift == "Squat"
+    assert avg_metric is not None  # estimated_1rm calculated in both-metrics mode
+    assert abs(bodyweight - 200.0) < 1.0  # bodyweight = weight

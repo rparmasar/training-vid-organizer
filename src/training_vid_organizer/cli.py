@@ -623,8 +623,9 @@ def open_files(
 @app.command("analyze")
 def analyze(
     metric: Annotated[
-        str, Argument(help="metric to analyze (estimated_1rm | total_set_volume)")
-    ] = "",
+        str | None,
+        Argument(help="metric to analyze (estimated_1rm | total_set_volume)"),
+    ] = None,
     lift: Annotated[
         str | None,
         Option("--lift", "-L", help="filter by exercise name (suffix match)"),
@@ -655,20 +656,37 @@ def analyze(
         console.print("[dim]No data found for analysis.[/dim]")
         return
 
-    # Render as Rich table (same pattern as list_lifts)
+    # Render as Rich table - handle both-metrics or single-metric output
     table = Table(box=None, show_header=True, header_style="bold")
     table.add_column("Iteration", style="cyan")
     table.add_column("Lift", style="magenta")
-    table.add_column(f"Avg {metric.replace('_', ' ').title()}", justify="right")
-    table.add_column("Avg Bodyweight (lbs)", justify="right")
 
-    for iteration, lift, metric_val, bw in results:
-        table.add_row(
-            str(iteration),
-            lift,
-            f"{metric_val:.2f}" if metric_val is not None else "-",
-            f"{bw:.1f}" if bw is not None else "-",
-        )
+    if metric is None:
+        # Both metrics case - show estimated_1rm, total_volume, and bodyweight
+        table.add_column("Avg Estimated 1RM (lbs)", justify="right")
+        table.add_column("Avg Total Volume", justify="right")
+        table.add_column("Avg Bodyweight (lbs)", justify="right")
+
+        for iteration, lift, est_1rm, vol, bw in results:
+            table.add_row(
+                str(iteration),
+                lift,
+                f"{est_1rm:.2f}" if est_1rm is not None else "-",
+                f"{vol:.0f}" if vol is not None else "-",
+                f"{bw:.1f}" if bw is not None else "-",
+            )
+    else:
+        # Single metric case - add metric column plus bodyweight
+        table.add_column(f"Avg {metric.replace('_', ' ').title()}", justify="right")
+        table.add_column("Avg Bodyweight (lbs)", justify="right")
+
+        for iteration, lift, metric_val, bw in results:
+            table.add_row(
+                str(iteration),
+                lift,
+                f"{metric_val:.2f}" if metric_val is not None else "-",
+                f"{bw:.1f}" if bw is not None else "-",
+            )
 
     console.print(table)
 

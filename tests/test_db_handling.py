@@ -1,4 +1,3 @@
-
 from src.training_vid_organizer.db_handling.db import (
     LiftEntry,
     add_lift_entry,
@@ -86,6 +85,7 @@ def test_virtual_columns_computed_on_insert(tmpdir):
 
     # Verify computed values in DB (stored as TEXT for precision)
     import sqlite3
+
     conn = sqlite3.connect(str(tmpdir / "test.db"))
     cursor = conn.cursor()
     cursor.execute("SELECT estimated_1rm, total_set_volume FROM lifts WHERE id=1")
@@ -116,6 +116,7 @@ def test_virtual_columns_edge_cases(tmpdir):
     add_lift_entry(tmpdir / "test.db", INPUT_ENTRY)
 
     import sqlite3
+
     conn = sqlite3.connect(str(tmpdir / "test.db"))
     cursor = conn.cursor()
     cursor.execute("SELECT estimated_1rm FROM lifts WHERE id=1")
@@ -145,6 +146,7 @@ def test_virtual_columns_aggregation_query(tmpdir):
 
     # Query for average estimated_1rm across iterations (should be ~224.91)
     import sqlite3
+
     conn = sqlite3.connect(str(tmpdir / "test.db"))
     cursor = conn.cursor()
     cursor.execute(

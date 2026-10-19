@@ -23,6 +23,11 @@ tvo init -d db/training.db # initialize SQLite DB for CLI
 - Default path: `db/training.db`.
 - Schema generated at runtime from `LiftEntry` dataclass fields.
 
+## Testing & Development
+- Write tests first when possible; keep them small and focused on behavior.
+- Use `pytest` + `typer.testing.CliRunner`; avoid mocking unless necessary.
+- Run `uv run pytest tests/` before committing changes.
+
 ## Pre-commit Hooks (Consolidated)
 All linting and validation runs via pre-commit framework before commits are finalized:
 

@@ -68,7 +68,7 @@ def fetch_lifts(
                     pass  # Keep as string if conversion fails
 
             # Ensure integer fields are ints (SQLite returns floats for REAL type)
-            int_fields = ["program_iteration", "weight", "reps"]
+            int_fields = ["weight", "reps"]
             for field in int_fields:
                 if (
                     isinstance(entry_dict.get(field), float)
@@ -180,38 +180,98 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
 
 
 def analyze_lifts(
-    db_path: Path, metric: str = "estimated_1rm"
+    db_path: Path,
+    metric: str | None = None,
+    lift: str | None = None,
+    iteration: str | None = None,
 ) -> list[tuple[int, str, float | None, float | None]]:
     """Run program iteration comparison analysis.
 
-    Returns list of (program_iteration, lift, avg_metric_value, avg_bodyweight).
+    Returns list of (program_iteration, lift_name, avg_metric_value, avg_bodyweight).
+    If no metric is specified, returns both estimated_1rm and total_set_volume.
+    Uses case-insensitive LIKE matching for lift filter and suffix-match via LIKE %value for iteration.
     """
 
-    if metric == "estimated_1rm":
-        col = "estimated_1rm"
-        alias = "avg_estimated_1rm"
-    elif metric == "total_set_volume":
-        col = "total_set_volume"
-        alias = "avg_total_set_volume"
+    # Build WHERE clause dynamically based on provided filters
+    where_parts: list[str] = []
+    params: list[Any] = []
+
+    # Add lift and iteration filters if provided (exact match for both)
+    if lift is not None:
+        where_parts.append("lift = ?")
+        params.append(lift)
+    if iteration is not None:
+        where_parts.append("program_iteration = ?")
+        params.append(iteration)
+
+    # Build base query with NOT NULL filter for both metrics when no metric specified
+    if metric is None and not where_parts:
+        query = """
+            SELECT
+                program_iteration,
+                lift,
+                AVG(estimated_1rm) as avg_estimated_1rm,
+                AVG(total_set_volume) as avg_total_set_volume,
+                AVG(bodyweight) as avg_bodyweight
+            FROM lifts
+        """
+
+    elif metric is None:
+        # Has filters but no metric specified - combine lift/iteration with metric filter
+        query = f"""
+            SELECT
+                program_iteration,
+                lift,
+                AVG(estimated_1rm) as avg_estimated_1rm,
+                AVG(total_set_volume) as avg_total_set_volume,
+                AVG(bodyweight) as avg_bodyweight
+            FROM lifts
+            WHERE ({" AND ".join(where_parts)})
+              AND (estimated_1rm IS NOT NULL OR total_set_volume IS NOT NULL)
+        """
     else:
-        raise ValueError(f"Unknown metric: {metric}")
+        if metric == "estimated_1rm":
+            col = "estimated_1rm"
+            alias = "avg_estimated_1rm"
+        elif metric == "total_set_volume":
+            col = "total_set_volume"
+            alias = "avg_total_set_volume"
+        else:
+            raise ValueError(f"Unknown metric: {metric}")
 
-    query = f"""
-        SELECT
-            program_iteration,
-            lift,
-            AVG({col}) as {alias},
-            AVG(bodyweight) as avg_bodyweight
-        FROM lifts
-        WHERE {col} IS NOT NULL
-        GROUP BY program_iteration, lift
-        ORDER BY program_iteration DESC
-    """
+        # Build base query with NOT NULL filter for selected metric
+        if where_parts:
+            query = f"""
+                SELECT
+                    program_iteration,
+                    lift,
+                    AVG({col}) as {alias},
+                    AVG(bodyweight) as avg_bodyweight
+                FROM lifts
+                WHERE ({" AND ".join(where_parts)})
+                  AND ({col} IS NOT NULL)
+            """
+        else:
+            query = f"""
+                SELECT
+                    program_iteration,
+                    lift,
+                    AVG({col}) as {alias},
+                    AVG(bodyweight) as avg_bodyweight
+                FROM lifts
+                WHERE {col} IS NOT NULL
+            """
+
+    # Add metric NOT NULL filter if not already included in base query (for when we have filters but no metric)
+    if metric is None and where_parts:
+        query += " AND (estimated_1rm IS NOT NULL OR total_set_volume IS NOT NULL)"
+
+    query += " GROUP BY program_iteration, lift ORDER BY date DESC"
 
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
-        cursor.execute(query)
+        cursor.execute(query, params)
 
         rows = cursor.fetchall()
 
@@ -223,16 +283,43 @@ def analyze_lifts(
         results = []
         for row in rows:
             entry_dict = dict(zip(columns, row))
-            results.append(
-                (
-                    int(entry_dict["program_iteration"]),
-                    str(entry_dict["lift"]),
-                    float(entry_dict[alias]) if entry_dict[alias] else None,
-                    float(entry_dict["avg_bodyweight"])
-                    if entry_dict["avg_bodyweight"]
-                    else None,
+
+            # Handle both-metrics case (metric is None)
+            if metric is None:
+                # Both metrics mode - return both estimated_1rm and total_set_volume
+                est_1rm = (
+                    float(entry_dict["avg_estimated_1rm"])
+                    if entry_dict["avg_estimated_1rm"]
+                    else None
                 )
-            )
+                vol = (
+                    float(entry_dict["avg_total_set_volume"])
+                    if entry_dict["avg_total_set_volume"]
+                    else None
+                )
+                results.append(
+                    (
+                        str(entry_dict["program_iteration"]),
+                        str(entry_dict["lift"]),
+                        est_1rm,
+                        vol,
+                        float(entry_dict["avg_bodyweight"])
+                        if entry_dict["avg_bodyweight"]
+                        else None,
+                    )
+                )
+            else:
+                # Single metric case - return avg_bodyweight as 4th column for consistency
+                results.append(
+                    (
+                        str(entry_dict["program_iteration"]),
+                        str(entry_dict["lift"]),
+                        float(entry_dict[alias]) if entry_dict[alias] else None,
+                        float(entry_dict["avg_bodyweight"])
+                        if entry_dict["avg_bodyweight"]
+                        else None,
+                    )
+                )
 
         return results
 

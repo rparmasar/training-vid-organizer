@@ -1,4 +1,4 @@
-"""Update and delete operations for SQLite database."""
+"""update and delete operations for sqlite database."""
 
 import sqlite3
 from pathlib import Path
@@ -8,17 +8,17 @@ from training_vid_organizer.logging_config import logger as tv_logger
 
 
 def update_lift_entry(db_path: Path, entry_id: int, **kwargs) -> bool:
-    """Update a lift entry by ID with only the provided fields.
+    """update a lift entry by id with only the provided fields.
 
     Args:
-        db_path: Path to SQLite database file.
-        entry_id: Primary key of row to update.
-        **kwargs: Field names and values to set (e.g., date="2025-03-16", weight=225).
+        db_path: path to sqlite database file.
+        entry_id: primary key of row to update.
+        **kwargs: field names and values to set (e.g., date="2025-03-16", weight=225).
 
     Returns:
-        True if a row was updated, False otherwise (e.g., ID not found).
+        True if a row was updated, False otherwise (e.g., id not found).
     """
-    # Validate field names against LiftEntry fields
+    # validate field names against LiftEntry fields
     valid_fields = {f.name for f in LiftEntry.__dataclass_fields__.values()}
     provided_fields = set(kwargs.keys())
 
@@ -29,12 +29,14 @@ def update_lift_entry(db_path: Path, entry_id: int, **kwargs) -> bool:
         )
         kwargs = {k: v for k, v in kwargs.items() if k in valid_fields}
 
-    # Convert string filepath to Path for validation, then back to string for SQL binding
+    # convert string filepath to Path for validation, then back to string for SQL binding
     if "filename" in kwargs:
         original_value = kwargs["filename"]
         if isinstance(original_value, str):
             kwargs["filename"] = Path(original_value)  # For type validation
-            kwargs["filename"] = str(kwargs["filename"])  # Convert back to string for SQL
+            kwargs["filename"] = str(
+                kwargs["filename"]
+            )  # Convert back to string for SQL
 
     if not kwargs:
         tv_logger.debug("update_lift_entry: no fields to update")
@@ -76,14 +78,14 @@ def update_lift_entry(db_path: Path, entry_id: int, **kwargs) -> bool:
 
 
 def delete_lift_entry(db_path: Path, entry_id: int) -> bool:
-    """Delete a lift entry by ID.
+    """delete a lift entry by ID.
 
     Args:
-        db_path: Path to SQLite database file.
-        entry_id: Primary key of row to delete.
+        db_path: path to sqlite database file.
+        entry_id: primary key of row to delete.
 
     Returns:
-        True if a row was deleted, False otherwise (e.g., ID not found).
+        True if a row was deleted, False otherwise (e.g., id not found).
     """
     conn = sqlite3.connect(db_path)
     try:

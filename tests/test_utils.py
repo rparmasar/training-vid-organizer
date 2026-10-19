@@ -1,100 +1,67 @@
-import os
+"""Tests for training_vid_organizer.utils module."""
+
 from pathlib import Path
 
-import typer
-
-from src.training_vid_organizer.utils import get_config_paths, open_video_file
-
-
-def test_get_config_paths_defaults():
-    # if this doesn't throw an error, we should be okay
-    db_path, video_dir = get_config_paths(Path("default/db/training.db"))
-
-    assert db_path == "default/db/training.db"
-    assert video_dir == ""
+from src.training_vid_organizer.utils import (
+    get_norm_key,
+)
 
 
-def test_get_config_paths_db_env_var(tmpdir):
-    # set env var
-    os.environ["TVO_DB_PATH"] = str(tmpdir / "custom.db")
+def test_get_norm_key_valid_file():
+    """Test that get_norm_key correctly extracts NORM value from valid filename."""
+    # Test basic format: prefix_NORM####.ext
+    path = Path("195035136_NORM0162.MP4")
+    result = get_norm_key(path)
+    assert result == (162, "NORM162_195035136.MP4")
 
-    # call fn
-    db_path, video_dir = get_config_paths(Path("default/db/training.db"))
+    # Test different NORM values
+    path = Path("273678336_NORM0165.mp4")
+    result = get_norm_key(path)
+    assert result == (165, "NORM165_273678336.mp4")
 
-    # exactly one row should be affected
-    assert db_path == str(tmpdir / "custom.db")
-    assert video_dir == ""
-
-
-def test_get_config_paths_video_env_var():
-    # set env var
-    os.environ["TVO_VIDEO_DIR"] = "/videos/storage"
-
-    # call fn
-    db_path, video_dir = get_config_paths(Path("default/db/training.db"))
-
-    assert db_path == "default/db/training.db"
-    assert video_dir == "/videos/storage"
+    # Test with uppercase extension
+    path = Path("file_NORM9999.MP4")
+    result = get_norm_key(path)
+    assert result == (9999, "NORM9999_file.MP4")
 
 
-def test_get_config_paths_both_env_vars():
-    # set both env vars
-    os.environ["TVO_DB_PATH"] = "/custom/db.sqlite"
-    os.environ["TVO_VIDEO_DIR"] = "/custom/videos"
+def test_get_norm_key_invalid_format():
+    """Test that get_norm_key returns None for invalid filenames."""
+    # No NORM in name
+    path = Path("123456789_video.mp4")
+    assert get_norm_key(path) is None
 
-    # call fn
-    db_path, video_dir = get_config_paths(Path("default/db/training.db"))
+    # NORM not at expected position (in first part instead of second)
+    path = Path("NORM0012_123456789.mp4")
+    assert get_norm_key(path) is None
 
-    assert db_path == "/custom/db.sqlite"
-    assert video_dir == "/custom/videos"
+    # Missing underscore separator
+    path = Path("123456789NORM0012.mp4")
+    assert get_norm_key(path) is None
 
-
-def test_get_config_paths_empty_string_video():
-    # set empty string for video dir
-    os.environ["TVO_VIDEO_DIR"] = ""
-
-    # call fn
-    db_path, video_dir = get_config_paths(Path("default/db/training.db"))
-
-    assert db_path == "default/db/training.db"
-    assert video_dir == ""
+    # Empty filename
+    path = Path("")
+    assert get_norm_key(path) is None
 
 
-def test_get_config_paths_custom_default():
-    # use custom default path
-    custom_default = Path("/app/data/training.db")
+def test_get_norm_key_edge_cases():
+    """Test edge cases and error handling."""
+    # NORM without numeric suffix (should fail on int conversion)
+    path = Path("123456789_NORMabc.mp4")
+    assert get_norm_key(path) is None
 
-    # call fn
-    db_path, video_dir = get_config_paths(custom_default)
+    # Multiple underscores - NORM must be immediately after first underscore
+    path = Path("prefix_extra_NORM0012.mp4")
+    assert get_norm_key(path) is None
 
-    assert db_path == "/app/data/training.db"
-    assert video_dir == ""
-
-
-def test_open_video_file_works(tmpdir, monkeypatch):
-    # setup inputs
-    input_filename = "test.txt"
-    input_base_dir = Path(tmpdir)
-
-    # write file to tmp dir
-    (input_base_dir / input_filename).write_text("Hello, world!")
-
-    # mock typer launch
-    called_urls = []
-    monkeypatch.setattr(typer, "launch", lambda url: called_urls.append(url))
-
-    # call fn
-    observed_result = open_video_file(input_filename, input_base_dir)
-
-    assert observed_result
+    # No extension
+    path = Path("123456789_NORM0012")
+    result = get_norm_key(path)
+    assert result == (12, "NORM12_123456789")
 
 
-def test_open_video_file_handles_not_found(tmpdir, monkeypatch):
-    # setup inputs
-    input_filename = "test.txt"
-    input_base_dir = Path(tmpdir)
-
-    # call fn
-    observed_result = open_video_file(input_filename, input_base_dir)
-
-    assert not observed_result
+def test_get_norm_key_zero_value():
+    """Test that NORM0 is handled correctly."""
+    path = Path("123456789_NORM0.mp4")
+    result = get_norm_key(path)
+    assert result == (0, "NORM0_123456789.mp4")

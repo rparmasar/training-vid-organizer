@@ -3,7 +3,11 @@ from src.training_vid_organizer.db_handling.db import (
     add_lift_entry,
     init_database,
 )
-from src.training_vid_organizer.db_handling.query import _build_query, fetch_lifts
+from src.training_vid_organizer.db_handling.query import (
+    _build_query,
+    analyze_lifts,
+    fetch_lifts,
+)
 
 
 def test_build_query_works_exact_date(all_lift_cols):
@@ -146,9 +150,7 @@ def test_build_query_works_warm_up_set(all_lift_cols):
     filter_input = {"warm_up_set": True}
 
     # expected return vals
-    expected_query = (
-        f"SELECT id, {all_lift_cols} FROM lifts WHERE warm_up_set = ? ORDER BY date DESC"
-    )
+    expected_query = f"SELECT id, {all_lift_cols} FROM lifts WHERE warm_up_set = ? ORDER BY date DESC"
     expected_parameter = [1]
 
     # check success
@@ -211,7 +213,7 @@ def test_fetch_lifts_works_no_filters(tmpdir):
     sample_lift_entry = LiftEntry(
         date="2025-01-01",
         program="Test Program",
-        program_iteration=1,
+        program_iteration="1",
         lift="Bicep Curl",
         weight=100,
         reps=2,
@@ -248,7 +250,7 @@ def test_fetch_lifts_works_with_filter(tmpdir):
     sample_lift_entry = LiftEntry(
         date="2025-01-01",
         program="Test Program",
-        program_iteration=1,
+        program_iteration="1",
         lift="Bicep Curl",
         weight=100,
         reps=2,
@@ -357,8 +359,12 @@ def test_fetch_lifts_includes_virtual_columns(tmpdir):
     assert hasattr(fetched, "total_set_volume"), "total_set_volume attribute missing"
 
     # Values should match expected calculations (Bryzycki: 200*36/(37-5)=225)
-    assert fetched.estimated_1rm == 225.0, f"Expected 225.0, got {fetched.estimated_1rm}"
-    assert fetched.total_set_volume == 1000.0, f"Expected 1000.0, got {fetched.total_set_volume}"
+    assert fetched.estimated_1rm == 225.0, (
+        f"Expected 225.0, got {fetched.estimated_1rm}"
+    )
+    assert fetched.total_set_volume == 1000.0, (
+        f"Expected 1000.0, got {fetched.total_set_volume}"
+    )
 
 
 def test_fetch_lifts_virtual_columns_with_filter(tmpdir):
@@ -415,7 +421,9 @@ def test_fetch_lifts_virtual_columns_aggregation(tmpdir):
 
     # Verify each row has the expected virtual column values (LiftResult dataclass)
     for row in observed_rows:
-        assert row.estimated_1rm is not None or row.reps == 0, f"Row missing estimated_1rm: {row}"
+        assert row.estimated_1rm is not None or row.reps == 0, (
+            f"Row missing estimated_1rm: {row}"
+        )
         assert row.total_set_volume is not None, f"Row missing total_set_volume: {row}"
 
 
@@ -440,4 +448,370 @@ def test_fetch_lifts_virtual_columns_edge_case(tmpdir):
     fetched = observed_rows[0]
 
     # estimated_1rm should be None for reps=0
-    assert fetched.estimated_1rm is None, f"Expected None for reps=0, got {fetched.estimated_1rm}"
+    assert fetched.estimated_1rm is None, (
+        f"Expected None for reps=0, got {fetched.estimated_1rm}"
+    )
+
+
+def test_analyze_lifts_no_filters(tmpdir):
+    """Test analyze_lifts returns all data when no filters provided."""
+    init_database(tmpdir / "test.db")
+
+    # Add sample data across multiple iterations and lifts
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="P9",
+            program_iteration=2,
+            lift="Squat",
+            weight=210,
+            reps=5,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Call analyze with no filters
+    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm")
+
+    assert (
+        len(results) == 3
+    )  # Three unique (iteration, lift) combinations: (2,Squat), (1,Bench Press), (1,Squat)
+    iterations = {r[0] for r in results}
+    lifts = {r[1] for r in results}
+    assert iterations == {"1", "2"}
+    assert lifts == {"Squat", "Bench Press"}
+
+
+def test_analyze_lifts_with_exact_lift_match(tmpdir):
+    """Test analyze_lifts filters by lift name using exact match."""
+    init_database(tmpdir / "test.db")
+
+    # Add data with various lift names
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Front Squat",
+            weight=180,
+            reps=6,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="P9",
+            program_iteration=2,
+            lift="Squat",
+            weight=210,
+            reps=5,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Filter by exact match "Squat" (should only match Squat, not Front Squat)
+    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", lift="Squat")
+
+    assert len(results) == 2  # Two unique combinations: Squat(iter2), Squat(iter1)
+    for iteration, lift, _, _ in results:
+        assert lift == "Squat"
+
+
+def test_analyze_lifts_with_iteration_filter_exact_match(tmpdir):
+    """Test analyze_lifts filters by program_iteration using exact match."""
+    init_database(tmpdir / "test.db")
+
+    # Add data with various iteration numbers as strings (stored as strings in DB)
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration="1",
+            lift="Squat",
+            weight=200,
+            reps=5,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration="10",
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="P9",
+            program_iteration="100",
+            lift="Squat",
+            weight=210,
+            reps=5,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Filter by exact match "10" (should only match iteration 10)
+    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", iteration="10")
+
+    assert len(results) == 1  # One unique combination with matching iteration
+    for iteration, lift, _, _ in results:
+        assert iteration == "10" and lift == "Bench Press"
+
+
+def test_analyze_lifts_with_both_filters(tmpdir):
+    """Test analyze_lifts filters by both lift and iteration simultaneously."""
+    init_database(tmpdir / "test.db")
+
+    # Add data with multiple combinations
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="P9",
+            program_iteration=2,
+            lift="Squat",
+            weight=210,
+            reps=5,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Filter by exact match iteration "1" and lift containing "quat" (suffix match)
+    results = analyze_lifts(
+        tmpdir / "test.db", metric="estimated_1rm", iteration="1", lift="Squat"
+    )
+
+    assert len(results) == 1  # Only one matching combination: (iteration=1, lift=Squat)
+    assert results[0][0] == "1"
+    assert results[0][1] == "Squat"
+
+
+def test_analyze_lifts_with_no_matches(tmpdir):
+    """Test analyze_lifts returns empty list when filters match nothing."""
+    init_database(tmpdir / "test.db")
+
+    # Add some data
+    sample_lift = LiftEntry(
+        date="2025-01-01",
+        program="P9",
+        program_iteration=1,
+        lift="Squat",
+        weight=200,
+        reps=5,
+    )
+    add_lift_entry(tmpdir / "test.db", sample_lift)
+
+    # Filter by non-existent combination
+    results = analyze_lifts(
+        tmpdir / "test.db", metric="estimated_1rm", iteration="999", lift="nonexistent"
+    )
+
+    assert len(results) == 0
+
+
+def test_analyze_lifts_total_set_volume_metric(tmpdir):
+    """Test analyze_lifts works with total_set_volume metric."""
+    init_database(tmpdir / "test.db")
+
+    # Add data with known values: weight=200, reps=5 -> volume = 1000
+    sample_lift = LiftEntry(
+        date="2025-01-01",
+        program="P9",
+        program_iteration=1,
+        lift="Squat",
+        weight=200,
+        reps=5,
+    )
+    add_lift_entry(tmpdir / "test.db", sample_lift)
+
+    results = analyze_lifts(
+        tmpdir / "test.db", metric="total_set_volume", iteration="1"
+    )
+
+    assert len(results) == 1
+    # Volume should be approximately 1000 (200 * 5)
+    assert abs(results[0][2] - 1000.0) < 1.0
+
+
+def test_analyze_lifts_with_filter_and_total_volume(tmpdir):
+    """Test analyze_lifts combines filters with total_set_volume metric."""
+    init_database(tmpdir / "test.db")
+
+    # Add data across iterations and lifts
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="P9",
+            program_iteration=2,
+            lift="Squat",
+            weight=210,
+            reps=5,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Filter by exact match iteration and lift with total_set_volume metric
+    results = analyze_lifts(
+        tmpdir / "test.db",
+        metric="total_set_volume",
+        iteration="1",
+        lift="Squat",
+    )
+
+    assert (
+        len(results) == 1
+    )  # Only Squat(iteration=1) matches
+
+
+def test_analyze_lifts_both_metrics_mode(tmpdir):
+    """Test analyze_lifts returns both metrics when no metric is specified."""
+    init_database(tmpdir / "test.db")
+
+    # Add data with known values: weight=200, reps=5 -> volume = 1000
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+            bodyweight=200.0,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+            bodyweight=180.0,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Call with no metric specified (None) - should return both metrics
+    results = analyze_lifts(tmpdir / "test.db")
+
+    assert len(results) == 2  # Two unique combinations
+    for program_iteration, lift, est_1rm, vol, bodyweight in results:
+        assert program_iteration in ("1",)
+        assert lift in ("Squat", "Bench Press")
+        # estimated_1rm should be calculated (not None)
+        assert est_1rm is not None
+        # bodyweight should be approximately 200 or 180
+        if lift == "Squat":
+            assert abs(bodyweight - 200.0) < 1.0
+        else:
+            assert abs(bodyweight - 180.0) < 1.0
+
+
+def test_analyze_lifts_both_metrics_with_filters(tmpdir):
+    """Test analyze_lifts returns both metrics with filters applied."""
+    init_database(tmpdir / "test.db")
+
+    # Add data across iterations and lifts
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="P9",
+            program_iteration=1,
+            lift="Squat",
+            weight=200,
+            reps=5,
+            bodyweight=200.0,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="P9",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=180,
+            reps=6,
+            bodyweight=180.0,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="P9",
+            program_iteration=2,
+            lift="Squat",
+            weight=210,
+            reps=5,
+            bodyweight=210.0,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(tmpdir / "test.db", entry)
+
+    # Filter by exact match iteration and lift with both metrics mode
+    results = analyze_lifts(
+        tmpdir / "test.db",
+        iteration="1",
+        lift="Squat",
+    )
+
+    assert len(results) == 1  # Only Squat(iteration=1) matches
+    program_iteration, lift, est_1rm, vol, bodyweight = results[0]
+    assert program_iteration == "1"
+    assert lift == "Squat"
+    assert est_1rm is not None  # estimated_1rm calculated in both-metrics mode
+    assert abs(bodyweight - 200.0) < 1.0  # bodyweight = weight

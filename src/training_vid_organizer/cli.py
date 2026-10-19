@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -12,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 from typer import Argument, Option, Typer, confirm, echo
 
-from training_vid_organizer.__about__ import __version__
+from training_vid_organizer.db_handling.csv_parser import parse_csv_to_lift_entries
 from training_vid_organizer.db_handling.db import (
     LiftEntry,
     add_lift_entry,
@@ -27,8 +28,8 @@ from training_vid_organizer.db_handling.update import (
 from training_vid_organizer.logging_config import logger as tv_logger
 from training_vid_organizer.utils import (
     get_config_paths,
-    get_video_base_dir,
-    open_video_file,
+    get_norm_key,
+    open_vlc_sequential,
 )
 
 # Set log level from environment variable if set
@@ -50,8 +51,8 @@ app = Typer(
     add_completion=False,
 )
 # wire up subcommands
-add_group = Typer(name="add", help="Add training data")
-list_group = Typer(name="list", help="List training data")
+add_group = Typer(name="add", help="add training data")
+list_group = Typer(name="list", help="list training data")
 app.add_typer(add_group)
 app.add_typer(list_group)
 
@@ -64,7 +65,10 @@ def callback(
 ):
     """main callback for the cli"""
     if version:
-        echo(f"training-vid-organizer v{__version__}")
+        from importlib import metadata
+
+        version = metadata.version("training-vid-organizer")
+        echo(f"training-vid-organizer v{version}")
 
 
 @app.command("init")
@@ -167,33 +171,41 @@ def add_lift(
 
 @add_group.command("session")
 def add_session(
-    config_path: Annotated[str, Argument(help="path to json configuration file")] = "",
+    config_path: Annotated[
+        str, Argument(help="path to json or csv configuration file")
+    ] = "",
     db_path: Annotated[
         str, Option("--db-path", "-d", help="override database path")
     ] = None,
 ):
-    """add multiple lifts from a json configuration file"""
+    """add multiple lifts from a JSON or CSV configuration file"""
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
-    # load and parse JSON
-    tv_logger.debug(f"loading session data from {config_path}")
-    with open(config_path) as f:
-        session_data = json.load(f)
+    csv_path = Path(config_path)
 
-    if not isinstance(session_data, list):
-        tv_logger.error("Error: JSON root must be a list of lift entries")
-        raise typer.Exit(code=1)
+    # Auto-detect format by extension (fallback to JSON if unknown)
+    if csv_path.suffix.lower() == ".csv":
+        tv_logger.debug(f"loading session data from CSV: {config_path}")
+        entries = parse_csv_to_lift_entries(csv_path)
+    else:
+        tv_logger.debug(f"loading session data from JSON: {config_path}")
+        with open(config_path) as f:
+            session_data = json.load(f)
 
-    # convert dicts to LiftEntry objects
-    try:
-        entries = [LiftEntry(**entry_dict) for entry_dict in session_data]
-    except (TypeError, ValueError) as e:
-        tv_logger.error(f"Error parsing lift entries: {e}")
-        raise typer.Exit(code=1)
+        if not isinstance(session_data, list):
+            tv_logger.error("Error: JSON root must be a list of lift entries")
+            raise typer.Exit(code=1)
+
+        # convert dicts to LiftEntry objects
+        try:
+            entries = [LiftEntry(**entry_dict) for entry_dict in session_data]
+        except (TypeError, ValueError) as e:
+            tv_logger.error(f"Error parsing lift entries: {e}")
+            raise typer.Exit(code=1)
 
     # add via function
-    rows_updated = add_session_entry(db_path=effective_db_path, entries=entries)
+    rows_updated = add_session_entry(db_path=effective_db_path, data=entries)
 
     if rows_updated == len(entries):
         console.print(
@@ -250,7 +262,7 @@ def list_lifts(
     if program is not None:
         filters["program"] = str(program)
     if iteration is not None:
-        filters["program_iteration"] = int(iteration)
+        filters["program_iteration"] = str(iteration)
     if lift is not None:
         filters["lift"] = str(lift)
     if weight is not None:
@@ -290,6 +302,7 @@ def list_lifts(
 
     # Define table columns explicitly (matching row data order)
     col_defs = [
+        ("id", "dim", "right", 5),
         ("date", "dim", None, None),
         ("program", "dim", None, None),
         ("program_iteration", "dim", None, None),
@@ -305,6 +318,7 @@ def list_lifts(
 
     for name, style, justify, width in col_defs:
         label = {
+            "id": "#",
             "date": "date",
             "program": "program",
             "program_iteration": "iteration",
@@ -330,47 +344,20 @@ def list_lifts(
         filepath_str = str(entry.filename) if entry.filename else "-"
 
         # Format virtual columns - handle None values gracefully
-        est_1rm_str = f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
-        volume_str = f"{entry.total_set_volume:.2f}" if entry.total_set_volume is not None else "-"
-
-        table.add_row(
-            str(entry.date),
-            str(entry.program),
-            f"{int(entry.program_iteration)}",
-            str(entry.lift),
-            f"{entry.weight:.1f}",
-            f"{int(entry.reps)}",
-            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
-            type_label,
-            filepath_str,
-            est_1rm_str,
-            volume_str,
+        est_1rm_str = (
+            f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
+        )
+        volume_str = (
+            f"{entry.total_set_volume:.2f}"
+            if entry.total_set_volume is not None
+            else "-"
         )
 
-    # Add ID column header after the table is built
-    table.add_column("id", style="dim", justify="right")
-
-    # Rebuild rows with ID column included
-    table.rows.clear()
-
-    for entry in entries:
-        type_labels = []
-        if entry.top_set:
-            type_labels.append("top")
-        if entry.warm_up_set:
-            type_labels.append("warm-up")
-        type_label = ", ".join(type_labels) if type_labels else "-"
-
-        filepath_str = str(entry.filename) if entry.filename else "-"
-
-        # Format virtual columns - handle None values gracefully
-        est_1rm_str = f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm is not None else "-"
-        volume_str = f"{entry.total_set_volume:.2f}" if entry.total_set_volume is not None else "-"
-
         table.add_row(
+            str(entry.entry_id) if entry.entry_id else "-",
             str(entry.date),
             str(entry.program),
-            f"{int(entry.program_iteration)}",
+            str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
@@ -379,11 +366,9 @@ def list_lifts(
             filepath_str,
             est_1rm_str,
             volume_str,
-            str(entry.entry_id) if entry.entry_id else "-",
         )
 
     console.print(table)
-    tv_logger.info(f"listed {len(entries)} lift(s)")
 
 
 @app.command("update")
@@ -433,7 +418,7 @@ def update(
     if program is not None:
         update_kwargs["program"] = str(program)
     if program_iteration is not None:
-        update_kwargs["program_iteration"] = int(program_iteration)
+        update_kwargs["program_iteration"] = str(program_iteration)
     if lift is not None:
         update_kwargs["lift"] = str(lift)
     if weight is not None:
@@ -529,6 +514,9 @@ def open_files(
     warm_up_set: Annotated[
         bool | None, Option("--warm-up-set", "-w", help="filter for warmup sets only")
     ] = None,
+    earliest: Annotated[
+        bool | None, Option("--earliest", "-e", help="show earliest videos first")
+    ] = None,
     limit: Annotated[
         int, Option("--limit", "-l", help="maximum number of results to show")
     ] = 50,
@@ -545,7 +533,7 @@ def open_files(
     if program is not None:
         filters["program"] = str(program)
     if iteration is not None:
-        filters["program_iteration"] = int(iteration)
+        filters["program_iteration"] = str(iteration)
     if lift is not None:
         filters["lift"] = str(lift)
     if weight is not None:
@@ -558,6 +546,11 @@ def open_files(
     # Fetch data
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
     entries = fetch_lifts(db_path=effective_db_path, filters=filters, limit=limit)
+    entries_w_filenames = [entry for entry in entries if entry.filename is not None]
+
+    tv_logger.info(
+        f"Showing {len(entries_w_filenames)} entries that have filenames from a total of {len(entries)}."
+    )
 
     if not entries:
         console.print("[dim]No lifts found matching the specified criteria.[/dim]")
@@ -566,14 +559,15 @@ def open_files(
     # Show results table (same style as list_lifts)
     table = Table(box=None, show_header=True, header_style="dim", expand=False)
     col_defs = [
-        ("date", "dim"),
-        ("program", "dim"),
-        ("program_iteration", "dim"),
-        ("lift", "dim"),
+        ("date", "dim", None),
+        ("program", "dim", None),
+        ("program_iteration", "dim", None),
+        ("lift", "dim", None),
         ("weight", None, "right"),
         ("reps", None, "right"),
-        ("type_label", "dim"),
-        ("filename", None),
+        ("bodyweight", None, "right"),
+        ("type_label", "dim", None),
+        ("filename", None, None),
     ]
 
     for name, style, justify in col_defs:
@@ -584,12 +578,13 @@ def open_files(
             "lift": "lift",
             "weight": "weight (lbs)",
             "reps": "reps",
+            "bodyweight": "bw (lbs)",
             "type_label": "type",
             "filename": "file",
         }[name]
         table.add_column(label, style=style, justify=justify)
 
-    for entry in entries:
+    for entry in entries_w_filenames:
         type_labels = (
             ["top"]
             if entry.top_set
@@ -600,58 +595,200 @@ def open_files(
         table.add_row(
             str(entry.date),
             str(entry.program),
-            f"{int(entry.program_iteration)}",
+            str(entry.program_iteration),
             str(entry.lift),
             f"{entry.weight:.1f}",
             f"{int(entry.reps)}",
+            f"{entry.bodyweight:.1f}" if entry.bodyweight else "-",
             type_label,
             str(entry.filename) if entry.filename else "-",
         )
 
     console.print(table)
 
-    # Open files (deduplicate with set)
-    base_dir = get_video_base_dir()
-    unique_files = sorted(set(str(e.filename) for e in entries if e.filename))
-
-    for filepath in unique_files:
-        open_video_file(filepath, base_dir)
+    _, video_dir = get_config_paths(
+        default_db_path=DB_DEFAULT
+        if effective_db_path is None
+        else Path(effective_db_path)
+    )
+    if video_dir:
+        unique_files = (
+            ([str(e.filename) for e in entries if e.filename])
+            if not earliest
+            else ([str(e.filename) for e in reversed(entries) if e.filename])
+        )
+        open_vlc_sequential(unique_files, Path(video_dir))
 
 
 @app.command("analyze")
 def analyze(
-    metric: Annotated[str, Argument(help="metric to analyze (estimated_1rm | total_set_volume)")] = "",
+    metric: Annotated[
+        str | None,
+        Argument(help="metric to analyze (estimated_1rm | total_set_volume)"),
+    ] = None,
+    lift: Annotated[
+        str | None,
+        Option("--lift", "-L", help="filter by exercise name (suffix match)"),
+    ] = None,
+    iteration: Annotated[
+        str | None,
+        Option("--iteration", "-i", help="filter by program iteration (suffix match)"),
+    ] = None,
     db_path: Annotated[
         str | None, Option("--db-path", "-d", help="override database path")
     ] = None,
 ):
-    """Run comparison analysis across program iterations."""
+    """run comparison analysis across program iterations."""
 
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
 
+    # Build filters dict for helper function
+    filters: dict[str, str | int | float] = {}
+    if lift is not None:
+        filters["lift"] = str(lift)
+    if iteration is not None:
+        filters["iteration"] = str(iteration)
+
     # Call pure helper function (handles connection internally)
-    results = analyze_lifts(effective_db_path, metric)
+    results = analyze_lifts(effective_db_path, metric, **filters)
 
     if not results:
         console.print("[dim]No data found for analysis.[/dim]")
         return
 
-    # Render as Rich table (same pattern as list_lifts)
+    # Render as Rich table - handle both-metrics or single-metric output
     table = Table(box=None, show_header=True, header_style="bold")
     table.add_column("Iteration", style="cyan")
     table.add_column("Lift", style="magenta")
-    table.add_column(f"Avg {metric.replace('_', ' ').title()}", justify="right")
-    table.add_column("Avg Bodyweight (lbs)", justify="right")
 
-    for iteration, lift, metric_val, bw in results:
-        table.add_row(
-            str(iteration),
-            lift,
-            f"{metric_val:.2f}" if metric_val is not None else "-",
-            f"{bw:.1f}" if bw is not None else "-"
-        )
+    if metric is None:
+        # Both metrics case - show estimated_1rm, total_volume, and bodyweight
+        table.add_column("Avg Estimated 1RM (lbs)", justify="right")
+        table.add_column("Avg Total Volume", justify="right")
+        table.add_column("Avg Bodyweight (lbs)", justify="right")
+
+        for iteration, lift, est_1rm, vol, bw in results:
+            table.add_row(
+                str(iteration),
+                lift,
+                f"{est_1rm:.2f}" if est_1rm is not None else "-",
+                f"{vol:.0f}" if vol is not None else "-",
+                f"{bw:.1f}" if bw is not None else "-",
+            )
+    else:
+        # Single metric case - add metric column plus bodyweight
+        table.add_column(f"Avg {metric.replace('_', ' ').title()}", justify="right")
+        table.add_column("Avg Bodyweight (lbs)", justify="right")
+
+        for iteration, lift, metric_val, bw in results:
+            table.add_row(
+                str(iteration),
+                lift,
+                f"{metric_val:.2f}" if metric_val is not None else "-",
+                f"{bw:.1f}" if bw is not None else "-",
+            )
 
     console.print(table)
+
+
+@app.command("process")
+def process(
+    directory: Annotated[str, Argument(help="target directory to organize")] = "",
+    dry_run: Annotated[
+        bool, Option("--dry-run", "-n", help="preview changes without modifying files")
+    ] = False,
+):
+    """
+    normalize video filenames in a directory by sorting NORM suffixes.
+    **note**: this exists to handle files created before 2026 as the naming format seems to have changed
+    """
+
+    # Validate directory argument
+    if not directory.strip():
+        console.print("[red]Error: Please provide a target directory.[/red]")
+        raise typer.Exit(code=1)
+
+    dir_path = Path(directory).resolve()
+
+    # Check read permissions and list files
+    try:
+        files = list(dir_path.iterdir())
+    except PermissionError as e:
+        tv_logger.error(f"Permission denied reading '{dir_path}': {e}")
+        console.print(f"[red]Cannot access directory: {e}[/red]")
+        raise typer.Exit(code=2)
+
+    # Filter NORM files (top-level only)
+    norm_files = [f for f in files if f.is_file() and "NORM" in f.name]
+
+    if not norm_files:
+        console.print("[red]Error: No files with 'NORM' found in directory.[/red]")
+        raise typer.Exit(code=1)
+
+    # Extract keys, filter invalid ones
+    valid_entries = []
+    failed_count = 0
+    for f in norm_files:
+        key = get_norm_key(f)
+        if key is not None:
+            valid_entries.append((f, key))
+        else:
+            failed_count += 1
+
+    if not valid_entries:
+        console.print("[dim]No files with valid NORM format found.[/dim]")
+        return
+
+    # Sort by numeric NORM value (ascending)
+    sorted_files = sorted(valid_entries, key=lambda x: x[1][0])
+
+    # Print preview of sorted order
+    console.print("Sorted order (NORM suffix):")
+    for i, (f, (_, new_name)) in enumerate(sorted_files, 1):
+        norm_val = (
+            f"{sorted_files[i - 1][1][0]:04d}" if sorted_files[i - 1][1][0] else "???"
+        )
+        console.print(f"  {i:3}. {f.name} → {new_name} (NORM{norm_val})")
+
+    # If dry-run, exit after preview
+    if dry_run:
+        console.print("[dim]Dry run complete. No files were modified.[/dim]")
+        return
+
+    # Ask for confirmation before renaming
+    confirm_input = typer.confirm(
+        f"\nNormalize {len(sorted_files)} file(s) in '{dir_path}'?"
+    )
+    if not confirm_input:
+        console.print("[yellow]Operation cancelled.[/yellow]")
+        return
+
+    # Execute normalization (rename files)
+    execution_failed = False
+
+    for f, (_, new_name) in sorted_files:
+        target_path = dir_path / new_name
+
+        try:
+            os.rename(str(f), str(target_path))
+        except PermissionError as e:
+            sys.stderr.write(f"  ⚠️  Skipping '{f.name}': permission denied - {e}\n")
+            execution_failed = True
+        except OSError as e:
+            # Handle cases where target exists or source was already moved
+            if "No such file or directory" in str(e):
+                sys.stderr.write(f"  ⚠️  Skipping '{f.name}': file no longer exists\n")
+            else:
+                sys.stderr.write(f"  ⚠️  Skipping '{f.name}': {e}\n")
+            execution_failed = True
+
+    # Final status message
+    if execution_failed:
+        console.print("\n[yellow]⚠️  Some file(s) were skipped due to errors.[/yellow]")
+    elif failed_count > 0:
+        console.print(
+            f"\n[yellow]⚠️  {failed_count} file(s) were skipped due to errors.[/yellow]"
+        )
 
 
 if __name__ == "__main__":

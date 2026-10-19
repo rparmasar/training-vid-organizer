@@ -1,4 +1,4 @@
-"""Centralized logging configuration for training-vid-organizer."""
+"""centralized logging configuration for training-vid-organizer."""
 
 import logging
 import sys
@@ -12,29 +12,27 @@ DEBUG_LOG_FILE = LOG_DIR / "debug.log"
 
 
 def get_logger(name: str = "tvo") -> logging.Logger:
-    """Return a configured logger instance.
+    """return a configured logger instance.
 
     Args:
-        name: Logger name (defaults to 'tvo'). Child loggers inherit this config.
+        name: logger name (defaults to 'tvo'). child loggers inherit this config.
 
     Returns:
-        Configured logger with console handler (INFO+) and file handler (DEBUG+).
+        configured logger with console handler (info+) and file handler (debug+).
     """
     log = logging.getLogger(name)
 
-    # Avoid duplicate handlers if imported multiple times
+    # avoid duplicate handlers if imported multiple times
     if not log.handlers:
         log.setLevel(logging.DEBUG)
 
-        # Console handler for INFO and above - writes to stdout explicitly
+        # console handler for info and above - writes to stdout explicitly
         console_handler = logging.StreamHandler(stream=sys.stdout)
-        console_formatter = logging.Formatter(
-            "%(levelname)s - %(name)s - %(message)s"
-        )
+        console_formatter = logging.Formatter("%(levelname)s - %(name)s - %(message)s")
         console_handler.setFormatter(console_formatter)
         log.addHandler(console_handler)
 
-        # File handler for DEBUG output with timestamps
+        # file handler for debug output with timestamps
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(DEBUG_LOG_FILE)
         debug_formatter = logging.Formatter(
@@ -47,5 +45,5 @@ def get_logger(name: str = "tvo") -> logging.Logger:
     return log
 
 
-# Singleton logger instance for convenience
+# singleton logger instance for convenience
 logger = get_logger()

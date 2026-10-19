@@ -1,1 +1,1 @@
-"""Training Video Organizer - A CLI tool for managing training videos."""
+"""training video organizer - a cli tool for managing training videos."""

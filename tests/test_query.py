@@ -541,8 +541,8 @@ def test_analyze_lifts_with_exact_lift_match(tmpdir):
         assert lift == "Squat"
 
 
-def test_analyze_lifts_with_iteration_filter_exact_match(tmpdir):
-    """Test analyze_lifts filters by program_iteration using exact match."""
+def test_analyze_lifts_with_iteration_filter_partial_match(tmpdir):
+    """Test analyze_lifts filters by program_iteration using partial match."""
     init_database(tmpdir / "test.db")
 
     # Add data with various iteration numbers as strings (stored as strings in DB)
@@ -550,7 +550,7 @@ def test_analyze_lifts_with_iteration_filter_exact_match(tmpdir):
         LiftEntry(
             date="2025-01-01",
             program="P9",
-            program_iteration="1",
+            program_iteration="P9-1",
             lift="Squat",
             weight=200,
             reps=5,
@@ -558,7 +558,7 @@ def test_analyze_lifts_with_iteration_filter_exact_match(tmpdir):
         LiftEntry(
             date="2025-01-02",
             program="P9",
-            program_iteration="10",
+            program_iteration="P9-2",
             lift="Bench Press",
             weight=180,
             reps=6,
@@ -566,7 +566,7 @@ def test_analyze_lifts_with_iteration_filter_exact_match(tmpdir):
         LiftEntry(
             date="2025-01-03",
             program="P9",
-            program_iteration="100",
+            program_iteration="531=5+",
             lift="Squat",
             weight=210,
             reps=5,
@@ -575,12 +575,10 @@ def test_analyze_lifts_with_iteration_filter_exact_match(tmpdir):
     for entry in entries:
         add_lift_entry(tmpdir / "test.db", entry)
 
-    # Filter by exact match "10" (should only match iteration 10)
-    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", iteration="10")
+    # Filter by partial match "10" (should match first 2)
+    results = analyze_lifts(tmpdir / "test.db", metric="estimated_1rm", iteration="P9")
 
-    assert len(results) == 1  # One unique combination with matching iteration
-    for iteration, lift, _, _ in results:
-        assert iteration == "10" and lift == "Bench Press"
+    assert len(results) == 2
 
 
 def test_analyze_lifts_with_both_filters(tmpdir):
@@ -716,9 +714,7 @@ def test_analyze_lifts_with_filter_and_total_volume(tmpdir):
         lift="Squat",
     )
 
-    assert (
-        len(results) == 1
-    )  # Only Squat(iteration=1) matches
+    assert len(results) == 1  # Only Squat(iteration=1) matches
 
 
 def test_analyze_lifts_both_metrics_mode(tmpdir):

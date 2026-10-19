@@ -4,7 +4,7 @@
 
 these are metrics computed from the data in the db and should
 
-### metrics to include
+### [done] metrics to include
 
 > **note:** implement these as calculated VIRTUAL cols in db (this may mean we need a separate dataclass from `LiftEntry` to capture these returned values e.g. `LiftResult`? or we can handle them like `entry_id`)
 

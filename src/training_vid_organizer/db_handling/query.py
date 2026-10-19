@@ -188,8 +188,10 @@ def analyze_lifts(
     """Run program iteration comparison analysis.
 
     Returns list of (program_iteration, lift_name, avg_metric_value, avg_bodyweight).
+
     If no metric is specified, returns both estimated_1rm and total_set_volume.
-    Uses case-insensitive LIKE matching for lift filter and suffix-match via LIKE %value for iteration.
+
+    Uses case-insensitive LIKE prefix matching for `iteration` filter (e.g. `"iteration%"`) and exact matching for `lift`.
     """
 
     # Build WHERE clause dynamically based on provided filters
@@ -201,8 +203,9 @@ def analyze_lifts(
         where_parts.append("lift = ?")
         params.append(lift)
     if iteration is not None:
-        where_parts.append("program_iteration = ?")
-        params.append(iteration)
+        iteration_val = f"{iteration}%"
+        where_parts.append("program_iteration LIKE ?")
+        params.append(iteration_val)
 
     # Build base query with NOT NULL filter for both metrics when no metric specified
     if metric is None and not where_parts:

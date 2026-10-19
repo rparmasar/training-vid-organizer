@@ -753,11 +753,11 @@ def test_analyze_lifts_both_metrics_mode(tmpdir):
     results = analyze_lifts(tmpdir / "test.db")
 
     assert len(results) == 2  # Two unique combinations
-    for iteration, lift, avg_metric, bodyweight in results:
-        assert iteration in ("1",)
+    for program_iteration, lift, est_1rm, vol, bodyweight in results:
+        assert program_iteration in ("1",)
         assert lift in ("Squat", "Bench Press")
         # estimated_1rm should be calculated (not None)
-        assert avg_metric is not None
+        assert est_1rm is not None
         # bodyweight should be approximately 200 or 180
         if lift == "Squat":
             assert abs(bodyweight - 200.0) < 1.0
@@ -810,8 +810,8 @@ def test_analyze_lifts_both_metrics_with_filters(tmpdir):
     )
 
     assert len(results) == 1  # Only Squat(iteration=1) matches
-    iteration, lift, avg_metric, bodyweight = results[0]
-    assert iteration == "1"
+    program_iteration, lift, est_1rm, vol, bodyweight = results[0]
+    assert program_iteration == "1"
     assert lift == "Squat"
-    assert avg_metric is not None  # estimated_1rm calculated in both-metrics mode
+    assert est_1rm is not None  # estimated_1rm calculated in both-metrics mode
     assert abs(bodyweight - 200.0) < 1.0  # bodyweight = weight

@@ -1,6 +1,12 @@
 # Training Video Organizer
 
+[![PyPI](https://img.shields.io/pypi/v/training-vid-organizer)](https://pypi.org/project/training-vid-organizer/)
+
 A CLI tool for organizing training videos, logging lift data, and sorting video files from the XTU S6 action camera.
+
+```bash
+pip install training-vid-organizer
+```
 
 ## Features
 

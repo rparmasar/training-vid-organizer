@@ -19,6 +19,10 @@ A CLI tool for organizing training videos, logging lift data, and sorting video 
 - Open filtered videos sequentially using VLC for side-by-side comparison
 - Dry-run mode to preview changes before applying them
 
+### Opening Videos Demo
+
+![demo calling tvo version and opening all deadlifts at 430](docs/tvo_demo_open_videos.gif)
+
 ## Prerequisites
 
 - Python 3.10+

@@ -44,8 +44,8 @@ jobs:
           elif echo "$COMMITS" | grep -qE '(fix|refactor)' ; then
             VERSION_BUMP="patch"
           else
-            # Default to minor if no conventional commits found
-            VERSION_BUMP="minor"
+            # Default to patch if no conventional commits found
+            VERSION_BUMP="patch"
           fi
           
           echo "Bumping version by: $VERSION_BUMP"

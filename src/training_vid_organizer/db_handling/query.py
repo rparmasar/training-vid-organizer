@@ -54,7 +54,9 @@ def fetch_lifts(
 
             # Keep both 'id' and 'entry_id' fields for compatibility
             if "id" in entry_dict:
-                entry_dict["entry_id"] = int(entry_dict.get("id"))  # Preserve original id value
+                entry_dict["entry_id"] = int(
+                    entry_dict.get("id")
+                )  # Preserve original id value
 
             # Convert boolean flags - SQLite returns integers (1/0) or booleans
             for key in ["top_set", "warm_up_set"]:
@@ -98,13 +100,17 @@ def fetch_lifts(
                 labels.append("warm-up")
 
             # Create LiftResult without 'id' and type_label ('id' is not a field, use entry_id)
-            filtered_dict = {k: v for k, v in entry_dict.items() if k not in ("id", "type_label")}
+            filtered_dict = {
+                k: v for k, v in entry_dict.items() if k not in ("id", "type_label")
+            }
             try:
                 result = LiftResult(**filtered_dict)
                 entries.append(result)
                 tv_logger.debug(f"Created LiftResult: {result}")
             except Exception as e:
-                tv_logger.error(f"Failed to create LiftResult from entry_dict={entry_dict}: {e}")
+                tv_logger.error(
+                    f"Failed to create LiftResult from entry_dict={entry_dict}: {e}"
+                )
 
         return entries
 
@@ -160,7 +166,7 @@ def _build_query(filters: dict[str, Any]) -> tuple[str, list[Any]]:
 
     if "program_iteration" in filters:
         where_clauses.append("program_iteration = ?")
-        params.append(int(filters["program_iteration"]))
+        params.append(str(filters["program_iteration"]))
 
     if "weight" in filters:
         where_clauses.append("weight = ?")
@@ -373,13 +379,16 @@ def export_lifts_to_csv(
                 "weight",
                 "reps",
                 "bodyweight",
-                "type",
+                "top_set",
+                "warm_up_set",
                 "filename",
                 "estimated_1rm",
                 "total_set_volume",
             ]
         else:
             fieldnames = csv_columns
+
+        print(entries)
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -399,7 +408,8 @@ def export_lifts_to_csv(
                     "bodyweight": (
                         f"{entry.bodyweight:.1f}" if entry.bodyweight else ""
                     ),
-                    "type": getattr(entry, "type_label", "-"),
+                    "top_set": entry.top_set if entry.top_set else "",
+                    "warm_up_set": entry.warm_up_set if entry.warm_up_set else "",
                     "filename": str(entry.filename) if entry.filename else "",
                     "estimated_1rm": (
                         f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm else ""

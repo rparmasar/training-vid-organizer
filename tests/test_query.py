@@ -88,7 +88,7 @@ def test_build_query_works_program_iteration(all_lift_cols):
 
     # expected return vals
     expected_query = f"SELECT id, {all_lift_cols} FROM lifts WHERE program_iteration = ? ORDER BY date DESC"
-    expected_parameter = [1]
+    expected_parameter = ["1"]
 
     # check success
     observed_query, observed_parameter = _build_query(filter_input)
@@ -870,7 +870,8 @@ def test_export_lifts_to_csv(tmpdir):
         "weight",
         "reps",
         "bodyweight",
-        "type",
+        "top_set",
+        "warm_up_set",
         "filename",
         "estimated_1rm",
         "total_set_volume",

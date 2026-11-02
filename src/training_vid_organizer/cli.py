@@ -20,7 +20,11 @@ from training_vid_organizer.db_handling.db import (
     add_session_entry,
     init_database,
 )
-from training_vid_organizer.db_handling.query import analyze_lifts, fetch_lifts
+from training_vid_organizer.db_handling.query import (
+    analyze_lifts,
+    export_lifts_to_csv,
+    fetch_lifts,
+)
 from training_vid_organizer.db_handling.update import (
     delete_lift_entry,
     update_lift_entries_from_csv,
@@ -32,22 +36,6 @@ from training_vid_organizer.utils import (
     get_norm_key,
     open_vlc_sequential,
 )
-
-# Column definitions for list_lifts display and export (must be defined before use)
-_LIST_COLUMNS = [
-    ("id", "dim", "right", 5),
-    ("date", "dim", None, None),
-    ("program", "dim", None, None),
-    ("program_iteration", "dim", None, None),
-    ("lift", "dim", None, None),
-    ("weight", None, "right", None),
-    ("reps", None, "right", None),
-    ("bodyweight", None, "right", None),
-    ("type_label", "dim", None, None),
-    ("filename", None, None, None),
-    ("estimated_1rm", None, "right", None),
-    ("total_set_volume", None, "right", None),
-]
 
 # Set log level from environment variable if set
 log_level = os.getenv("TVO_LOG_LEVEL", "INFO").upper()
@@ -128,7 +116,7 @@ def add_lift(
         str, Option("--program", help="name of the training program")
     ] = None,
     program_iteration: Annotated[
-        int, Option("--iteration", "-i", help="current iteration number")
+        str, Option("--iteration", "-i", help="current iteration number")
     ] = 1,
     lift: Annotated[
         str, Option("--lift", "-l", help="exercise name (e.g. squat)")
@@ -243,7 +231,7 @@ def list_lifts(
         str | None, Option("--program", help="filter by program name")
     ] = None,
     iteration: Annotated[
-        int | None, Option("--iteration", "-i", help="filter by iteration number")
+        str | None, Option("--iteration", "-i", help="filter by iteration number")
     ] = None,
     lift: Annotated[
         str | None, Option("--lift", "-L", help="filter by exercise name")
@@ -323,11 +311,7 @@ def list_lifts(
         try:
             output_path = Path(export).resolve()
 
-            from training_vid_organizer.db_handling.query import export_lifts_to_csv
-
-            # Pass CSV columns to include ID in exported file for round-trip editing
-            csv_columns = [col[0] for col in _LIST_COLUMNS]  # ["id", "date", ...]
-            export_lifts_to_csv(entries, output_path, csv_columns=csv_columns)
+            export_lifts_to_csv(entries, output_path)
 
             console.print(
                 f"[green]✓[/green] exported {len(entries)} lift(s) to '{output_path}'"
@@ -361,10 +345,6 @@ def list_lifts(
         ("estimated_1rm", None, "right", None),
         ("total_set_volume", None, "right", None),
     ]
-
-    # For export mode, include ID in the CSV header for round-trip editing
-    if export is not None:
-        csv_columns = [col[0] for col in col_defs]  # ["id", "date", ...]
 
     for name, style, justify, width in col_defs:
         label = {

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from src.training_vid_organizer.db_handling.db import (
     LiftEntry,
     add_lift_entry,
@@ -6,6 +8,7 @@ from src.training_vid_organizer.db_handling.db import (
 from src.training_vid_organizer.db_handling.query import (
     _build_query,
     analyze_lifts,
+    export_lifts_to_csv,
     fetch_lifts,
 )
 
@@ -816,3 +819,182 @@ def test_analyze_lifts_both_metrics_with_filters(tmpdir):
     assert lift == "Squat"
     assert est_1rm is not None  # estimated_1rm calculated in both-metrics mode
     assert abs(bodyweight - 200.0) < 1.0  # bodyweight = weight
+
+
+def test_export_lifts_to_csv(tmpdir):
+    """Test that export_lifts_to_csv writes correct CSV output."""
+    init_database(Path(tmpdir) / "test.db")
+
+    # Add sample data
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="PPL v1.0",
+            program_iteration=1,
+            lift="Squat",
+            weight=225,
+            reps=8,
+            bodyweight=195.0,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="PPL v1.0",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=185,
+            reps=6,
+            bodyweight=195.0,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(Path(tmpdir) / "test.db", entry)
+
+    # Fetch and export
+    fetched = fetch_lifts(Path(tmpdir) / "test.db", {})
+    csv_path = Path(tmpdir) / "export.csv"
+    export_lifts_to_csv(fetched, csv_path)
+
+    # Verify CSV exists and has correct structure
+    assert csv_path.exists()
+
+    with open(csv_path) as f:
+        lines = f.readlines()
+
+    # Check header row
+    expected_header = [
+        "id",
+        "date",
+        "program",
+        "program_iteration",
+        "lift",
+        "weight",
+        "reps",
+        "bodyweight",
+        "type",
+        "filename",
+        "estimated_1rm",
+        "total_set_volume",
+    ]
+    header_line = lines[0].strip().split(",")
+    assert len(header_line) == len(expected_header), (
+        f"Header mismatch: {header_line} vs {expected_header}"
+    )
+
+    # Check data rows
+    assert len(lines) == 3, "Expected 2 data rows + header"
+
+    for i, line in enumerate(lines[1:], start=1):
+        values = line.strip().split(",")
+        assert len(values) == len(expected_header), (
+            f"Row {i} has wrong number of columns: {values}"
+        )
+
+
+def test_export_lifts_to_csv_with_filters(tmpdir):
+    """Test that export_lifts_to_csv works correctly with filtered results."""
+    init_database(Path(tmpdir) / "test.db")
+
+    # Add sample data across multiple iterations and lifts
+    entries = [
+        LiftEntry(
+            date="2025-01-01",
+            program="PPL v1.0",
+            program_iteration=1,
+            lift="Squat",
+            weight=225,
+            reps=8,
+        ),
+        LiftEntry(
+            date="2025-01-02",
+            program="PPL v1.0",
+            program_iteration=1,
+            lift="Bench Press",
+            weight=185,
+            reps=6,
+        ),
+        LiftEntry(
+            date="2025-01-03",
+            program="PPL v1.0",
+            program_iteration=2,
+            lift="Squat",
+            weight=235,
+            reps=8,
+        ),
+    ]
+    for entry in entries:
+        add_lift_entry(Path(tmpdir) / "test.db", entry)
+
+    # Fetch with filter and export
+    fetched = fetch_lifts(
+        Path(tmpdir) / "test.db", {"program_iteration": 1}
+    )
+    csv_path = Path(tmpdir) / "filtered_export.csv"
+    export_lifts_to_csv(fetched, csv_path)
+
+    # Verify only filtered entries are exported
+    assert len(fetched) == 2, "Expected exactly 2 entries with program_iteration=1"
+
+    with open(csv_path) as f:
+        lines = f.readlines()
+
+    assert len(lines) == 3, "Expected 2 data rows + header for filtered export"
+
+
+def test_export_lifts_to_csv_empty_results(tmpdir):
+    """Test that export_lifts_to_csv handles empty result sets gracefully."""
+    init_database(Path(tmpdir) / "test.db")
+
+    # Add some data but filter for nothing matching
+    sample_entry = LiftEntry(
+        date="2025-01-01",
+        program="PPL v1.0",
+        program_iteration=1,
+        lift="Squat",
+        weight=225,
+        reps=8,
+    )
+    add_lift_entry(Path(tmpdir) / "test.db", sample_entry)
+
+    # Fetch with non-matching filter and export
+    fetched = fetch_lifts(
+        Path(tmpdir) / "test.db", {"program_iteration": 999}
+    )
+    csv_path = Path(tmpdir) / "empty_export.csv"
+    export_lifts_to_csv(fetched, csv_path)
+
+    # Verify CSV exists with only header row
+    assert csv_path.exists()
+
+    with open(csv_path) as f:
+        lines = f.readlines()
+
+    assert len(lines) == 1, "Expected only header row for empty results"
+
+
+def test_export_lifts_to_csv_handles_none_values(tmpdir):
+    """Test that export_lifts_to_csv handles None values correctly."""
+    init_database(Path(tmpdir) / "test.db")
+
+    # Add entry with some None fields (bodyweight is optional)
+    sample_entry = LiftEntry(
+        date="2025-01-01",
+        program="PPL v1.0",
+        program_iteration=1,
+        lift="Squat",
+        weight=225,
+        reps=8,
+        bodyweight=None,  # Explicitly None
+    )
+    add_lift_entry(Path(tmpdir) / "test.db", sample_entry)
+
+    fetched = fetch_lifts(Path(tmpdir) / "test.db", {})
+    csv_path = Path(tmpdir) / "none_values.csv"
+    export_lifts_to_csv(fetched, csv_path)
+
+    with open(csv_path) as f:
+        content = f.read()
+
+    # None values should be exported as empty strings in CSV
+    assert "225.0,8," in content or ",," in content, (
+        "None values should be represented as empty fields"
+    )

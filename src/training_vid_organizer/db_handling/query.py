@@ -1,5 +1,6 @@
 """Query module for fetching lift data from SQLite."""
 
+import csv
 import sqlite3
 from dataclasses import fields
 from pathlib import Path
@@ -89,7 +90,17 @@ def fetch_lifts(
                 )
                 entry_dict["total_set_volume"] = float(entry_dict["total_set_volume"])
 
-            entries.append(LiftResult(**entry_dict))
+            # Compute type_label from flags (not stored in DB)
+            labels = []
+            if entry_dict.get("top_set"):
+                labels.append("top")
+            if entry_dict.get("warm_up_set"):
+                labels.append("warm-up")
+
+            # Create LiftResult without type_label (it's computed in __post_init__)
+            entries.append(
+                LiftResult(**{k: v for k, v in entry_dict.items() if k != "type_label"})
+            )
 
         return entries
 
@@ -213,7 +224,7 @@ def analyze_lifts(
             SELECT
                 program_iteration,
                 lift,
-                AVG(estimated_1rm) as avg_estimated_1rm,
+                AVG(CASE WHEN top_set = TRUE THEN estimated_1rm END) as avg_estimated_1rm,
                 AVG(total_set_volume) as avg_total_set_volume,
                 AVG(bodyweight) as avg_bodyweight
             FROM lifts
@@ -225,7 +236,7 @@ def analyze_lifts(
             SELECT
                 program_iteration,
                 lift,
-                AVG(estimated_1rm) as avg_estimated_1rm,
+                AVG(CASE WHEN top_set = TRUE THEN estimated_1rm ELSE NULL END) as avg_estimated_1rm,
                 AVG(total_set_volume) as avg_total_set_volume,
                 AVG(bodyweight) as avg_bodyweight
             FROM lifts
@@ -236,9 +247,12 @@ def analyze_lifts(
         if metric == "estimated_1rm":
             col = "estimated_1rm"
             alias = "avg_estimated_1rm"
+            # check 1rms for topsets only
+            computation_col = f"AVG(CASE WHEN top_set = TRUE THEN {col} END) as {alias}"
         elif metric == "total_set_volume":
             col = "total_set_volume"
             alias = "avg_total_set_volume"
+            computation_col = f"AVG({col}) as {alias}"
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
@@ -248,7 +262,7 @@ def analyze_lifts(
                 SELECT
                     program_iteration,
                     lift,
-                    AVG({col}) as {alias},
+                    {computation_col},
                     AVG(bodyweight) as avg_bodyweight
                 FROM lifts
                 WHERE ({" AND ".join(where_parts)})
@@ -259,7 +273,7 @@ def analyze_lifts(
                 SELECT
                     program_iteration,
                     lift,
-                    AVG({col}) as {alias},
+                    {computation_col},
                     AVG(bodyweight) as avg_bodyweight
                 FROM lifts
                 WHERE {col} IS NOT NULL
@@ -328,3 +342,65 @@ def analyze_lifts(
 
     finally:
         conn.close()
+
+
+def export_lifts_to_csv(entries: list[LiftResult], output_path: Path) -> bool:
+    """Write lift entries to CSV file.
+
+    Args:
+        entries: List of LiftResult objects to export.
+        output_path: Destination path for the CSV file.
+
+    Returns:
+        True on success, raises typer.Exit(code=2) on failure.
+    """
+    try:
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "id",
+                    "date",
+                    "program",
+                    "program_iteration",
+                    "lift",
+                    "weight",
+                    "reps",
+                    "bodyweight",
+                    "type",
+                    "filename",
+                    "estimated_1rm",
+                    "total_set_volume",
+                ],
+            )
+            writer.writeheader()
+
+            for entry in entries:
+                row = {
+                    "id": str(entry.entry_id) if entry.entry_id else "",
+                    "date": str(entry.date),
+                    "program": str(entry.program),
+                    "program_iteration": str(entry.program_iteration),
+                    "lift": str(entry.lift),
+                    "weight": f"{entry.weight:.1f}",
+                    "reps": int(entry.reps),
+                    "bodyweight": (
+                        f"{entry.bodyweight:.1f}" if entry.bodyweight else ""
+                    ),
+                    "type": getattr(entry, "type_label", "-"),
+                    "filename": str(entry.filename) if entry.filename else "",
+                    "estimated_1rm": (
+                        f"{entry.estimated_1rm:.2f}" if entry.estimated_1rm else ""
+                    ),
+                    "total_set_volume": (
+                        f"{entry.total_set_volume:.2f}"
+                        if entry.total_set_volume
+                        else ""
+                    ),
+                }
+                writer.writerow(row)
+
+        tv_logger.debug(f"exported {len(entries)} lift(s) to '{output_path}'")
+        return True
+    except Exception as e:
+        tv_logger.error(f"CSV export failed: {e}")

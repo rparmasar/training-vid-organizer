@@ -35,6 +35,7 @@ class LiftResult(LiftEntry):
     # Virtual columns (computed at insert time, stored for fast reads)
     estimated_1rm: float | None = field(init=False, default=None)
     total_set_volume: float | None = field(init=False, default=0.0)
+    type_label: str = field(init=False, default="-")
 
     def __post_init__(self):
         # Bryzycki method: w * (36 / (37 - r))
@@ -47,6 +48,14 @@ class LiftResult(LiftEntry):
                 else None
             )
             self.total_set_volume = round(float(self.weight) * int(self.reps), 2)
+
+        # Compute type_label from flags
+        labels = []
+        if self.top_set:
+            labels.append("top")
+        if self.warm_up_set:
+            labels.append("warm-up")
+        self.type_label = ", ".join(labels) if labels else "-"
 
 
 def convert_to_result(entry: LiftEntry | LiftResult) -> LiftResult:

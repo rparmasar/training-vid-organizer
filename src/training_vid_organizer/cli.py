@@ -252,6 +252,14 @@ def list_lifts(
     limit: Annotated[
         int | None, Option("--limit", "-l", help="maximum number of results to show")
     ] = 100,
+    export: Annotated[
+        Path | None,
+        Option(
+            "--export",
+            "-e",
+            help="Export results to CSV file at specified path",
+        ),
+    ] = None,
 ):
     """list lifts from the database with optional filters"""
     # Build filters dict from CLI arguments
@@ -292,6 +300,25 @@ def list_lifts(
     if not entries:
         console.print("[dim]No lifts found matching the specified criteria.[/dim]")
         return
+
+    # Handle export mode
+    if export is not None:
+        try:
+            output_path = Path(export).resolve()
+
+            from training_vid_organizer.db_handling.query import export_lifts_to_csv
+
+            export_lifts_to_csv(entries, output_path)
+
+            console.print(
+                f"[green]✓[/green] exported {len(entries)} lift(s) to '{output_path}'"
+            )
+            return  # Exit early when exporting
+        except typer.Exit:
+            raise
+        except Exception as e:
+            tv_logger.error(f"Export failed: {e}")
+            raise typer.Exit(code=2) from e
 
     table = Table(
         box=None,

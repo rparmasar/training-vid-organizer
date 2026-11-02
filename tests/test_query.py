@@ -731,6 +731,7 @@ def test_analyze_lifts_both_metrics_mode(tmpdir):
             weight=200,
             reps=5,
             bodyweight=200.0,
+            top_set=True,
         ),
         LiftEntry(
             date="2025-01-02",
@@ -740,6 +741,7 @@ def test_analyze_lifts_both_metrics_mode(tmpdir):
             weight=180,
             reps=6,
             bodyweight=180.0,
+            top_set=True,
         ),
     ]
     for entry in entries:
@@ -775,6 +777,7 @@ def test_analyze_lifts_both_metrics_with_filters(tmpdir):
             weight=200,
             reps=5,
             bodyweight=200.0,
+            top_set=True,
         ),
         LiftEntry(
             date="2025-01-02",
@@ -784,6 +787,7 @@ def test_analyze_lifts_both_metrics_with_filters(tmpdir):
             weight=180,
             reps=6,
             bodyweight=180.0,
+            top_set=True,
         ),
         LiftEntry(
             date="2025-01-03",
@@ -793,6 +797,7 @@ def test_analyze_lifts_both_metrics_with_filters(tmpdir):
             weight=210,
             reps=5,
             bodyweight=210.0,
+            top_set=True,
         ),
     ]
     for entry in entries:

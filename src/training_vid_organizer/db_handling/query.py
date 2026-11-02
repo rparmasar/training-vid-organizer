@@ -388,8 +388,6 @@ def export_lifts_to_csv(
         else:
             fieldnames = csv_columns
 
-        print(entries)
-
         with open(output_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()

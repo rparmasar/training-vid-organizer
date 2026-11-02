@@ -52,9 +52,9 @@ def fetch_lifts(
         for row in rows:
             entry_dict = dict(zip(columns, row))
 
-            # Map 'id' column to 'entry_id' field (backward compat)
+            # Keep both 'id' and 'entry_id' fields for compatibility
             if "id" in entry_dict:
-                entry_dict["entry_id"] = int(entry_dict.pop("id"))
+                entry_dict["entry_id"] = int(entry_dict.get("id"))  # Preserve original id value
 
             # Convert boolean flags - SQLite returns integers (1/0) or booleans
             for key in ["top_set", "warm_up_set"]:
@@ -97,10 +97,14 @@ def fetch_lifts(
             if entry_dict.get("warm_up_set"):
                 labels.append("warm-up")
 
-            # Create LiftResult without type_label (it's computed in __post_init__)
-            entries.append(
-                LiftResult(**{k: v for k, v in entry_dict.items() if k != "type_label"})
-            )
+            # Create LiftResult without 'id' and type_label ('id' is not a field, use entry_id)
+            filtered_dict = {k: v for k, v in entry_dict.items() if k not in ("id", "type_label")}
+            try:
+                result = LiftResult(**filtered_dict)
+                entries.append(result)
+                tv_logger.debug(f"Created LiftResult: {result}")
+            except Exception as e:
+                tv_logger.error(f"Failed to create LiftResult from entry_dict={entry_dict}: {e}")
 
         return entries
 
@@ -344,40 +348,48 @@ def analyze_lifts(
         conn.close()
 
 
-def export_lifts_to_csv(entries: list[LiftResult], output_path: Path) -> bool:
+def export_lifts_to_csv(
+    entries: list[LiftResult], output_path: Path, csv_columns: list[str] | None = None
+) -> bool:
     """Write lift entries to CSV file.
 
     Args:
         entries: List of LiftResult objects to export.
         output_path: Destination path for the CSV file.
+        csv_columns: Optional custom column order (default: standard columns including id).
 
     Returns:
         True on success, raises typer.Exit(code=2) on failure.
     """
     try:
+        # Use provided columns or default to standard set with ID included
+        if csv_columns is None:
+            fieldnames = [
+                "id",
+                "date",
+                "program",
+                "program_iteration",
+                "lift",
+                "weight",
+                "reps",
+                "bodyweight",
+                "type",
+                "filename",
+                "estimated_1rm",
+                "total_set_volume",
+            ]
+        else:
+            fieldnames = csv_columns
+
         with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(
-                f,
-                fieldnames=[
-                    "id",
-                    "date",
-                    "program",
-                    "program_iteration",
-                    "lift",
-                    "weight",
-                    "reps",
-                    "bodyweight",
-                    "type",
-                    "filename",
-                    "estimated_1rm",
-                    "total_set_volume",
-                ],
-            )
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
 
             for entry in entries:
                 row = {
-                    "id": str(entry.entry_id) if entry.entry_id else "",
+                    "id": str(entry.entry_id)
+                    if entry.entry_id
+                    else "",  # Use .entry_id from LiftEntry (mapped from DB 'id' column)
                     "date": str(entry.date),
                     "program": str(entry.program),
                     "program_iteration": str(entry.program_iteration),

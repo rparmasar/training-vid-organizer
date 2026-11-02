@@ -3,6 +3,7 @@
 import sqlite3
 from pathlib import Path
 
+from training_vid_organizer.db_handling.csv_parser import parse_csv_for_update
 from training_vid_organizer.db_handling.db import LiftEntry
 from training_vid_organizer.logging_config import logger as tv_logger
 
@@ -99,5 +100,82 @@ def delete_lift_entry(db_path: Path, entry_id: int) -> bool:
 
     except sqlite3.Error as e:
         raise ValueError(f"Database error while deleting row #{entry_id}: {e}") from e
+    finally:
+        conn.close()
+
+
+def update_lift_entries_from_csv(
+    db_path: Path, csv_path: Path, id_column: str = "id"
+) -> int:
+    """Parse CSV and update existing lift entries by ID.
+
+    Args:
+        db_path: SQLite database path
+        csv_path: CSV file to parse (must include 'id' column)
+        id_column: Name of the ID column in CSV (default: "id")
+
+    Returns:
+        Number of rows updated
+
+    Raises:
+        ValueError: If CSV missing required columns or entries lack IDs
+    """
+    # Parse CSV into LiftEntry objects with IDs
+    entries = parse_csv_for_update(csv_path)
+
+    if not entries:
+        tv_logger.debug("No valid entries found in CSV for update")
+        return 0
+
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+
+        # Build SET clause from each entry's fields (excluding id)
+        set_clauses = []
+        values_placeholders = []
+
+        for entry in entries:
+            # Collect all field values except 'id'
+            row_values = {}
+            for field_name, field_value in entry.__dict__.items():
+                if field_name != "id":  # Skip ID, it's the WHERE clause
+                    set_clauses.append(f"{field_name} = ?")
+                    row_values[field_name] = field_value
+
+            # Build placeholders and values for this row
+            if row_values:
+                placeholders = ",".join("?" * len(row_values))
+                values_placeholders.append((placeholders, tuple(row_values.values())))
+
+        if not values_placeholders:
+            tv_logger.debug("No fields to update in CSV entries")
+            return 0
+
+        # Build WHERE clause with all IDs from the CSV
+        ids = [entry.id for entry in entries]
+        where_clause = f"WHERE id IN ({','.join('?' * len(ids))})"
+
+        # Combine all values: row values + IDs for WHERE clause
+        all_values = []
+        for placeholders, row_vals in values_placeholders:
+            all_values.extend(row_vals)
+        all_values.extend(ids)
+
+        sql = f"UPDATE lifts SET {', '.join(set_clauses)} {where_clause}"
+
+        tv_logger.debug(
+            f"Executing bulk update with {len(entries)} entries, SQL length={len(sql)}"
+        )
+
+        cursor.execute(sql, all_values)
+        conn.commit()
+
+        updated_count = cursor.rowcount
+        tv_logger.debug(f"Bulk updated {updated_count} lift entries from CSV")
+        return updated_count
+
+    except sqlite3.Error as e:
+        raise ValueError(f"Database error while updating lifts from CSV: {e}") from e
     finally:
         conn.close()

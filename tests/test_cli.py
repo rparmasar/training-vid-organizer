@@ -662,7 +662,9 @@ def test_cli_list_lifts_shows_virtual_columns(runner, tmpdir):
     # estimated_1rm = 200 * (36 / (37 - 5)) = 225.0, volume = 200 * 5 = 1000.0
     import re
 
-    assert re.search(r"225\.", result.output) and re.search(r"\b100\b", result.output.replace(" ", ""))
+    assert re.search(r"225\.", result.output) and re.search(
+        r"\b100\b", result.output.replace(" ", "")
+    )
 
 
 def test_cli_list_lifts_with_virtual_columns_aggregation(runner, tmpdir):

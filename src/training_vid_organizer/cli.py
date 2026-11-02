@@ -23,6 +23,7 @@ from training_vid_organizer.db_handling.db import (
 from training_vid_organizer.db_handling.query import analyze_lifts, fetch_lifts
 from training_vid_organizer.db_handling.update import (
     delete_lift_entry,
+    update_lift_entries_from_csv,
     update_lift_entry,
 )
 from training_vid_organizer.logging_config import logger as tv_logger
@@ -31,6 +32,22 @@ from training_vid_organizer.utils import (
     get_norm_key,
     open_vlc_sequential,
 )
+
+# Column definitions for list_lifts display and export (must be defined before use)
+_LIST_COLUMNS = [
+    ("id", "dim", "right", 5),
+    ("date", "dim", None, None),
+    ("program", "dim", None, None),
+    ("program_iteration", "dim", None, None),
+    ("lift", "dim", None, None),
+    ("weight", None, "right", None),
+    ("reps", None, "right", None),
+    ("bodyweight", None, "right", None),
+    ("type_label", "dim", None, None),
+    ("filename", None, None, None),
+    ("estimated_1rm", None, "right", None),
+    ("total_set_volume", None, "right", None),
+]
 
 # Set log level from environment variable if set
 log_level = os.getenv("TVO_LOG_LEVEL", "INFO").upper()
@@ -308,7 +325,9 @@ def list_lifts(
 
             from training_vid_organizer.db_handling.query import export_lifts_to_csv
 
-            export_lifts_to_csv(entries, output_path)
+            # Pass CSV columns to include ID in exported file for round-trip editing
+            csv_columns = [col[0] for col in _LIST_COLUMNS]  # ["id", "date", ...]
+            export_lifts_to_csv(entries, output_path, csv_columns=csv_columns)
 
             console.print(
                 f"[green]✓[/green] exported {len(entries)} lift(s) to '{output_path}'"
@@ -342,6 +361,10 @@ def list_lifts(
         ("estimated_1rm", None, "right", None),
         ("total_set_volume", None, "right", None),
     ]
+
+    # For export mode, include ID in the CSV header for round-trip editing
+    if export is not None:
+        csv_columns = [col[0] for col in col_defs]  # ["id", "date", ...]
 
     for name, style, justify, width in col_defs:
         label = {
@@ -401,6 +424,9 @@ def list_lifts(
 @app.command("update")
 def update(
     entry_id: Annotated[int, Argument(help="row id to update")] = 0,
+    csv_path: Annotated[
+        Path | None, Option("--csv", "-c", help="CSV file with IDs for bulk update")
+    ] = None,
     date: Annotated[str | None, Option("--date", help="new training date")] = None,
     program: Annotated[str | None, Option("--program", help="new program name")] = None,
     program_iteration: Annotated[
@@ -434,9 +460,21 @@ def update(
         str | None, Option("--db-path", "-d", help="override database path")
     ] = None,
 ):
-    """update a lift entry by id with the provided fields"""
+    """update a lift entry by id with the provided fields or bulk update from CSV"""
     # allow per-command override
     effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
+
+    # Handle CSV-based bulk update (takes precedence if provided)
+    if csv_path is not None:
+        tv_logger.debug(f"bulk updating lifts from CSV: {csv_path}")
+        csv_path_obj = Path(csv_path)
+        rows_updated = update_lift_entries_from_csv(
+            db_path=effective_db_path, csv_path=csv_path_obj
+        )
+        console.print(
+            f"[green]✓[/green] updated {rows_updated} lift(s) from '{csv_path}'"
+        )
+        return
 
     # Collect update kwargs (exclude None values to avoid unintended NULLs)
     update_kwargs: dict[str, Any] = {}

@@ -849,7 +849,7 @@ def test_export_lifts_to_csv(tmpdir):
     for entry in entries:
         add_lift_entry(Path(tmpdir) / "test.db", entry)
 
-    # Fetch and export
+    # Fetch and export (use fetch_lifts to get proper LiftResult with id field)
     fetched = fetch_lifts(Path(tmpdir) / "test.db", {})
     csv_path = Path(tmpdir) / "export.csv"
     export_lifts_to_csv(fetched, csv_path)
@@ -925,9 +925,7 @@ def test_export_lifts_to_csv_with_filters(tmpdir):
         add_lift_entry(Path(tmpdir) / "test.db", entry)
 
     # Fetch with filter and export
-    fetched = fetch_lifts(
-        Path(tmpdir) / "test.db", {"program_iteration": 1}
-    )
+    fetched = fetch_lifts(Path(tmpdir) / "test.db", {"program_iteration": 1})
     csv_path = Path(tmpdir) / "filtered_export.csv"
     export_lifts_to_csv(fetched, csv_path)
 
@@ -956,9 +954,7 @@ def test_export_lifts_to_csv_empty_results(tmpdir):
     add_lift_entry(Path(tmpdir) / "test.db", sample_entry)
 
     # Fetch with non-matching filter and export
-    fetched = fetch_lifts(
-        Path(tmpdir) / "test.db", {"program_iteration": 999}
-    )
+    fetched = fetch_lifts(Path(tmpdir) / "test.db", {"program_iteration": 999})
     csv_path = Path(tmpdir) / "empty_export.csv"
     export_lifts_to_csv(fetched, csv_path)
 

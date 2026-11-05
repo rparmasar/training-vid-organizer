@@ -735,6 +735,49 @@ def analyze(
     console.print(table)
 
 
+@app.command("query")
+def query(
+    db_path: Annotated[
+        str | None, Option("--db-path", "-d", help="override database path")
+    ] = None,
+):
+    """Launch interactive SQL shell."""
+
+    effective_db_path = db_path or get_config_paths(default_db_path=DB_DEFAULT)[0]
+
+    print(f"[dim]Connected to {effective_db_path}[/dim]")
+    print("[dim].tables | .schema | .quit | Ctrl+D to exit[/dim]")
+    print("-" * 60)
+
+    conn = sqlite3.connect(str(effective_db_path))
+    try:
+        while True:
+            sql = input("> ").strip()
+            if not sql or sql.startswith("."):
+                continue
+
+            cursor = conn.cursor()
+            try:
+                cursor.execute(sql)
+                rows = cursor.fetchall()
+
+                # Print column headers
+                desc = (
+                    [col[0] for col in cursor.description] if cursor.description else []
+                )
+                print(" | ".join(desc))
+                print("-" * 60)
+
+                # Print results
+                for row in rows:
+                    print(" | ".join(str(v) for v in row))
+            except sqlite3.Error as e:
+                print(f"[red]Error: {e}[/red]")
+
+    finally:
+        conn.close()
+
+
 @app.command("process")
 def process(
     directory: Annotated[str, Argument(help="target directory to organize")] = "",

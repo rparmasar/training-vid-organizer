@@ -751,6 +751,31 @@ def query(
 
     conn = sqlite3.connect(str(effective_db_path))
     try:
+        # Initialize readline for history navigation (up arrow repeats last command)
+        import readline
+
+        if not hasattr(readline, "read_history_file"):
+            import atexit
+
+            class rlHistory:
+                def __init__(self):
+                    self.histfile = Path(effective_db_path).parent / ".sql_history"
+                    self.histfile.parent.mkdir(parents=True, exist_ok=True)
+
+                def init(self):
+                    readline.set_history_length(100)
+                    if self.histfile.exists():
+                        readline.read_history_file(str(self.histfile))
+
+                def save(self):
+                    try:
+                        readline.write_history_file(str(self.histfile))
+                    except Exception:
+                        pass
+
+            atexit.register(rlHistory().save())
+            rlHistory().init()
+
         while True:
             sql = input("> ").strip()
             if not sql or sql.startswith("."):
@@ -761,16 +786,42 @@ def query(
                 cursor.execute(sql)
                 rows = cursor.fetchall()
 
-                # Print column headers
+                # Print column headers with alignment
                 desc = (
                     [col[0] for col in cursor.description] if cursor.description else []
                 )
-                print(" | ".join(desc))
-                print("-" * 60)
 
-                # Print results
-                for row in rows:
-                    print(" | ".join(str(v) for v in row))
+                if rows:
+                    # Build Rich table dynamically from result columns
+                    table = Table(box=None, show_header=True, header_style="bold")
+
+                    for col in desc:
+                        # Auto-detect column type for alignment
+                        if col.lower() in ("id", "weight", "reps"):
+                            table.add_column(col, justify="left", width=8)
+                        elif col.lower() in ("date", "program", "lift"):
+                            table.add_column(col, justify="left", width=15)
+                        else:
+                            table.add_column(col, justify="left")
+
+                    for row in rows:
+                        values = []
+                        for i, val in enumerate(row):
+                            if val is None:
+                                values.append("-")
+                            elif isinstance(val, bool):
+                                values.append("✓" if val else "✗")
+                            elif isinstance(val, float):
+                                # Format numbers with 2 decimal places
+                                values.append(f"{val:.2f}")
+                            else:
+                                values.append(str(val))
+
+                        table.add_row(*values)
+
+                    console.print(table)
+                else:
+                    print("[dim]No rows returned.[/dim]")
             except sqlite3.Error as e:
                 print(f"[red]Error: {e}[/red]")
 

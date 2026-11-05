@@ -106,7 +106,7 @@ def parse_csv_for_update(csv_path: Path) -> list[LiftEntry]:
         for row_num, row in enumerate(reader, start=2):
             try:
                 entry = LiftEntry(
-                    id=int(row["id"]),  # ID is required and must be int
+                    entry_id=int(row["id"]),  # ID is required and must be int
                     date=str(row["date"]),
                     program=str(row["program"]),
                     program_iteration=str(row["program_iteration"]),

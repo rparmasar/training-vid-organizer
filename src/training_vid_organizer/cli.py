@@ -446,7 +446,6 @@ def update(
 
     # Handle CSV-based bulk update (takes precedence if provided)
     if csv_path is not None:
-        tv_logger.debug(f"bulk updating lifts from CSV: {csv_path}")
         csv_path_obj = Path(csv_path)
         rows_updated = update_lift_entries_from_csv(
             db_path=effective_db_path, csv_path=csv_path_obj

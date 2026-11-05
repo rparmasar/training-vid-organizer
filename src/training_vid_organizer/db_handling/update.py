@@ -120,7 +120,7 @@ def update_lift_entries_from_csv(
     Raises:
         ValueError: If CSV missing required columns or entries lack IDs
     """
-    # Parse CSV into LiftEntry objects with IDs
+    # Step 1: Parse CSV into LiftEntry objects with IDs
     entries = parse_csv_for_update(csv_path)
 
     if not entries:
@@ -130,50 +130,30 @@ def update_lift_entries_from_csv(
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.cursor()
+        total_updated = 0
 
-        # Build SET clause from each entry's fields (excluding id)
-        set_clauses = []
-        values_placeholders = []
-
+        # Step 2 & 3: For each entry, build and execute a parameterized UPDATE statement
         for entry in entries:
-            # Collect all field values except 'id'
-            row_values = {}
-            for field_name, field_value in entry.__dict__.items():
-                if field_name != "id":  # Skip ID, it's the WHERE clause
-                    set_clauses.append(f"{field_name} = ?")
-                    row_values[field_name] = field_value
+            # Collect all field values except 'entry_id' (the ID is the WHERE clause)
+            row_values = [(k, v) for k, v in entry.__dict__.items() if k != "entry_id"]
 
-            # Build placeholders and values for this row
-            if row_values:
-                placeholders = ",".join("?" * len(row_values))
-                values_placeholders.append((placeholders, tuple(row_values.values())))
+            if not row_values:
+                continue
 
-        if not values_placeholders:
-            tv_logger.debug("No fields to update in CSV entries")
-            return 0
+            # Build SET clause with parameterized placeholders
+            set_clause = ", ".join(f"{k} = ?" for k, _ in row_values)
 
-        # Build WHERE clause with all IDs from the CSV
-        ids = [entry.id for entry in entries]
-        where_clause = f"WHERE id IN ({','.join('?' * len(ids))})"
+            # Parameters: all field values + the entry ID for WHERE clause
+            params = tuple(v for _, v in row_values) + (entry.entry_id,)
 
-        # Combine all values: row values + IDs for WHERE clause
-        all_values = []
-        for placeholders, row_vals in values_placeholders:
-            all_values.extend(row_vals)
-        all_values.extend(ids)
+            sql = f"UPDATE lifts SET {set_clause} WHERE id = ?"
+            cursor.execute(sql, params)
+            total_updated += cursor.rowcount
 
-        sql = f"UPDATE lifts SET {', '.join(set_clauses)} {where_clause}"
-
-        tv_logger.debug(
-            f"Executing bulk update with {len(entries)} entries, SQL length={len(sql)}"
-        )
-
-        cursor.execute(sql, all_values)
+        # commit all at the end
         conn.commit()
-
-        updated_count = cursor.rowcount
-        tv_logger.debug(f"Bulk updated {updated_count} lift entries from CSV")
-        return updated_count
+        tv_logger.debug(f"Bulk updated {total_updated} lift entries from CSV")
+        return total_updated
 
     except sqlite3.Error as e:
         raise ValueError(f"Database error while updating lifts from CSV: {e}") from e

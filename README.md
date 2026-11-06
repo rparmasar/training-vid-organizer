@@ -110,8 +110,38 @@ tvo process /videos/NORM                    # Apply sorting after confirmation
 # Update a lift entry (by ID)
 tvo update 42 --weight 230
 
+# Bulk update from CSV file
+tvo update --csv data/updates.csv
+
 # Delete an entry
 tvo delete 42 --force
+```
+
+### Interactive SQL Shell
+
+The `query` command launches an interactive SQLite shell for advanced data exploration:
+
+```bash
+tvo query
+```
+
+**Features:**
+- Full SQL access to your lift database with Rich-formatted output tables
+- Built-in commands: `.tables`, `.schema`, `.quit`
+- Command history navigation (up arrow) with automatic save to `~/.sql_history`
+- Auto-detects column types for optimal alignment and formatting
+- Boolean values displayed as ✓/✗, numbers formatted to 2 decimals
+
+**Examples:**
+```bash
+# List all tables in the database
+tvo query > .tables
+
+# View schema of the lifts table
+tvo query > .schema
+
+# Run custom queries (e.g., find top sets by estimated 1RM)
+tvo query > SELECT * FROM lifts WHERE top_set = TRUE ORDER BY estimated_1rm DESC LIMIT 20;
 ```
 
 ## CSV Import Format
@@ -150,6 +180,39 @@ date,program,program_iteration,lift,weight,reps,bodyweight,top_set,reps_in_reser
 2026-09-30,Push/Pull/Legs,1,squat,225,8,185,true,1,/videos/squat_20260930.mp4
 2026-09-30,Push/Pull/Legs,1,bench press,135,10,185,false,2,/videos/bench_20260930.mp4
 ```
+
+### Bulk Update CSV Format
+
+Use the `--csv` option with `tvo update` to bulk-update multiple entries at once:
+
+```bash
+tvo update --csv data/updates.csv
+```
+
+**Required Columns:**
+- `id`: Database ID of the entry to update (must be present)
+
+**Standard Columns:** Same as import format (`date`, `program`, `program_iteration`, `lift`, `weight`, `reps`)
+
+**Optional Columns:** All optional columns from the import format are supported:
+- `bodyweight`
+- `top_set`
+- `warm_up_set`
+- `reps_in_reserve`
+- `filename`
+
+**Example Update CSV:**
+
+```csv
+id,date,program,program_iteration,lift,weight,reps,bodyweight,top_set,reps_in_reserve,filename
+42,2026-10-05,Push/Pull/Legs,1,squat,230,8,185,true,1,/videos/squat_20261005.mp4
+43,2026-10-05,Push/Pull/Legs,1,bench press,140,9,185,false,2,/videos/bench_20261005.mp4
+```
+
+**Validation Rules:**
+- All columns must be present (strict mode)
+- Unknown columns cause the import to fail immediately
+- Boolean flags accept: `true`, `false`, `1`, `0`, `yes`, `no` (case-insensitive)
 
 ## Calculated Views
 
